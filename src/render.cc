@@ -30,49 +30,20 @@
 #include "evalcontext.h"
 #include "builtin.h"
 #include "polyset.h"
+#include "FactoryNode.h"
+#include "cgalutils.h"
+#include "clipper-utils.h"
+#include "maybe_const.h"
 
 #include <sstream>
-#include <boost/assign/std/vector.hpp>
-using namespace boost::assign; // bring 'operator+=()' into scope
 
-class RenderModule : public AbstractModule
+class RenderNode : public FactoryNode
 {
 public:
-	RenderModule() { }
-	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const;
+	virtual ResultObject processChildren(const NodeGeometries &children) const
+	{
+		return GeomUtils::apply(children, OPENSCAD_UNION);
+	}
 };
 
-AbstractNode *RenderModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const
-{
-	RenderNode *node = new RenderNode(inst);
-
-	AssignmentList args;
-	args += Assignment("convexity");
-
-	Context c(ctx);
-	c.setVariables(args, evalctx);
-	inst->scope.apply(*evalctx);
-
-	ValuePtr v = c.lookup_variable("convexity");
-	if (v->type() == Value::NUMBER)
-		node->convexity = (int)v->toDouble();
-
-	std::vector<AbstractNode *> instantiatednodes = inst->instantiateChildren(evalctx);
-	node->children.insert(node->children.end(), instantiatednodes.begin(), instantiatednodes.end());
-
-	return node;
-}
-
-std::string RenderNode::toString() const
-{
-	std::stringstream stream;
-
-	stream << this->name() << "(convexity = " << convexity << ")";
-
-	return stream.str();
-}
-
-void register_builtin_render()
-{
-	Builtins::init("render", new RenderModule());
-}
+FactoryModule<RenderNode> RenderNodeFactory("render");

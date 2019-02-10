@@ -8,6 +8,22 @@
 #include "module.h"
 #include "value.h"
 #include "localscope.h"
+#include "evalcontext.h"
+#include "annotation.h"
+
+class Parameter : public Assignment
+{
+public:
+	explicit Parameter(const Assignment &assignment) : Assignment(assignment) { }
+	virtual ~Parameter() { }
+
+	virtual void addAnnotations(AnnotationList *annotations);
+	virtual bool hasAnnotations() const;
+	virtual const Annotation *annotation(const std::string &name) const;
+
+private:
+	AnnotationMap annotations;
+};
 
 class FileModule : public AbstractModule
 {
@@ -15,9 +31,10 @@ public:
 	FileModule() : is_handling_dependencies(false) {}
 	virtual ~FileModule();
 
-	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx = nullptr) const;
+	AbstractNode *evaluate(class Context &ctx) const;
+
+	virtual AbstractNode *instantiate(const class Context *ctx, const class ModuleContext *evalctx) const;
 	virtual std::string dump(const std::string &indent, const std::string &name) const;
-	AbstractNode *instantiateWithFileContext(class FileContext *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const;
 
 	void setModulePath(const std::string &path) { this->path = path; }
 	const std::string &modulePath() const { return this->path; }
@@ -28,6 +45,8 @@ public:
 	bool hasIncludes() const { return !this->includes.empty(); }
 	bool usesLibraries() const { return !this->usedlibs.empty(); }
 	bool isHandlingDependencies() const { return this->is_handling_dependencies; }
+
+	std::vector<Parameter> getParameters() const;
 
 	LocalScope scope;
 	typedef std::unordered_set<std::string> ModuleContainer;

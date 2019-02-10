@@ -27,8 +27,22 @@
 #include "function.h"
 #include "evalcontext.h"
 #include "expression.h"
+#include "expressions.h"
+#include "modcontext.h"
+#include "builtin.h"
 
 AbstractFunction::~AbstractFunction()
+{
+}
+
+FactoryFunction::FactoryFunction(const char *name, eval_func_t func) 
+	: BuiltinFunction(func), name(name)
+{
+	Builtins::init(name, this);
+}
+
+UserFunction::UserFunction(const char *name, AssignmentList &definition_arguments, const Location &loc)
+	: ASTNode(loc), name(name), definition_arguments(definition_arguments), expr(shared_ptr<Expression>(new Lookup("@result", loc)))
 {
 }
 
@@ -43,12 +57,9 @@ UserFunction::~UserFunction()
 
 ValuePtr UserFunction::evaluate(const Context *ctx, const EvalContext *evalctx) const
 {
-	if (!expr) return ValuePtr::undefined;
-	Context c(ctx);
-	c.setVariables(definition_arguments, evalctx);
-	ValuePtr result = expr->evaluate(&c);
-
-	return result;
+	ScopeContext sc(ctx, scope, definition_arguments, evalctx);
+	sc.setName("UserFunction", name);
+	return expr->evaluate(&sc);
 }
 
 std::string UserFunction::dump(const std::string &indent, const std::string &name) const
@@ -61,7 +72,14 @@ std::string UserFunction::dump(const std::string &indent, const std::string &nam
 		dump << arg.name;
 		if (arg.expr) dump << " = " << *arg.expr;
 	}
-	dump << ") = " << *expr << ";\n";
+	dump << ")";
+	if (scope.numElements() > 0) {
+		dump << " {";
+		dump << scope.dump(indent + "\t");
+		dump << indent << "}\n";
+	}
+	else
+		dump << " = " << *expr << ";\n";
 	return dump.str();
 }
 
@@ -105,6 +123,11 @@ public:
 		return result;
 	}
 };
+
+UserFunction *UserFunction::create(const char *name, AssignmentList &definition_arguments, const Location &loc)
+{
+	return new UserFunction(name, definition_arguments, loc);
+}
 
 UserFunction *UserFunction::create(const char *name, AssignmentList &definition_arguments, shared_ptr<Expression> expr, const Location &loc)
 {

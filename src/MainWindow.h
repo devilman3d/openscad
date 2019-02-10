@@ -13,12 +13,15 @@
 #include "memory.h"
 #include "editor.h"
 #include "export.h"
+#include "progress.h"
 #include <vector>
 #include <QMutex>
 #include <QTime>
 #include <QIODevice>
+#include <boost/smart_ptr/detail/spinlock_pool.hpp>
+#include <boost/smart_ptr/detail/spinlock.hpp>
 
-class MainWindow : public QMainWindow, public Ui::MainWindow
+class MainWindow : public QMainWindow, public Ui::MainWindow, public IProgress
 {
 	Q_OBJECT
 
@@ -40,13 +43,15 @@ public:
 
 	QTime renderingTime;
 
-	ModuleContext top_ctx;
+	ScopeContext top_ctx;
 	FileModule *root_module;		  // Result of parsing
 	FileModule *parsed_module;		// Last parse for include list
-	ModuleInstantiation root_inst;	// Top level instance
-	AbstractNode *absolute_root_node; // Result of tree evaluation
-	AbstractNode *root_node;		  // Root if the root modifier (!) is used
+	shared_ptr<const AbstractNode> absolute_root_node; // Result of tree evaluation
+	const AbstractNode *root_node;		  // Root if the root modifier (!) is used
 	Tree tree;
+	Progress progress;
+	QTimer progressTicker;
+	bool progressTicking;
 
 #ifdef ENABLE_CGAL
 	shared_ptr<const class Geometry> root_geom;
@@ -65,6 +70,7 @@ public:
 		QLabel *versionLabel;
 		QWidget *editorDockTitleWidget;
 		QWidget *consoleDockTitleWidget;
+		QWidget *objectsDockTitleWidget;
 		QWidget *parameterDockTitleWidget;
 
 	QString editortype;	
@@ -100,7 +106,7 @@ private:
 		void initActionIcon(QAction *action, const char *darkResource, const char *lightResource);
 		void handleFileDrop(const QString &filename);
 	void refreshDocument();
-	void updateCamera(const class FileContext &ctx);
+	void updateCamera(const class Context &ctx);
 	void updateTemporalVariables();
 	bool fileChangedOnDisk();
 	void compileTopLevelDocument();
@@ -145,7 +151,9 @@ private slots:
 	void instantiateRoot();
 	void compileDone(bool didchange);
 	void compileEnded();
+#ifdef PARAMETER_UI
 	void changeParameterWidget();
+#endif
 
 private slots:
 	void pasteViewportTranslation();
@@ -155,6 +163,8 @@ private slots:
 	void hideEditor();
 	void hideConsole();
 	void showConsole();
+	void hideObjects();
+	void showObjects();
 	void hideParameters();
 
 private slots:
@@ -210,10 +220,12 @@ public slots:
 	void actionReloadRenderPreview();
 		void on_editorDock_visibilityChanged(bool);
 		void on_consoleDock_visibilityChanged(bool);
+		void on_objectsDock_visibilityChanged(bool);
 		void on_parameterDock_visibilityChanged(bool);
 		void on_toolButtonCompileResultClose_clicked();
 		void editorTopLevelChanged(bool);
 		void consoleTopLevelChanged(bool);
+		void objectsTopLevelChanged(bool);
 		void parameterTopLevelChanged(bool);
 
 #ifdef ENABLE_OPENCSG
@@ -257,8 +269,14 @@ public slots:
 	void autoReloadSet(bool);
 	void setContentsChanged();
 
+	public: // IProgress implementation
+		void progress_changed() override;
+		bool progress_is_canceled() override;
+
+	private slots:
+		void tickProgress();
+
 private:
-	static void report_func(const class AbstractNode*, void *vp, int mark);
 	static bool mdiMode;
 	static bool undockMode;
 	static bool reorderMode;

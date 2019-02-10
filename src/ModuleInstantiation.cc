@@ -1,37 +1,16 @@
 #include "ModuleInstantiation.h"
 #include "evalcontext.h"
 #include "expression.h"
-#include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
-
-ModuleInstantiation::~ModuleInstantiation()
-{
-}
-
-IfElseModuleInstantiation::~IfElseModuleInstantiation()
-{
-}
-
-/*!
-	Returns the absolute path to the given filename, unless it's empty.
-
-	NB! This will actually search for the file, to be backwards compatible with <= 2013.01
-	(see issue #217)
-*/
-std::string ModuleInstantiation::getAbsolutePath(const std::string &filename) const
-{
-	if (!filename.empty() && !fs::path(filename).is_absolute()) {
-		return fs::absolute(fs::path(this->modpath) / filename).string();
-	}
-	else {
-		return filename;
-	}
-}
+#include "expressions.h"
+#include "modcontext.h"
+#include "node.h"
 
 std::string ModuleInstantiation::dump(const std::string &indent) const
 {
 	std::stringstream dump;
 	dump << indent;
+	if (!dotname.empty())
+		dump << dotname << ".";
 	dump << modname + "(";
 	for (size_t i=0; i < this->arguments.size(); i++) {
 		const Assignment &arg = this->arguments[i];
@@ -73,24 +52,26 @@ std::string IfElseModuleInstantiation::dump(const std::string &indent) const
 
 AbstractNode *ModuleInstantiation::evaluate(const Context *ctx) const
 {
-	EvalContext c(ctx, this->arguments, &this->scope);
+	ModuleContext ec(ctx, this);
+	ec.setName("ModuleInstantiation", identifier());
 
-#if 0 && DEBUG
-	PRINT("New eval ctx:");
-	c.dump(NULL, this);
+#if DEBUG
+	std::cerr << "Instantiating module: ";
+	if (!dotname.empty())
+		std::cerr << dotname << ".";
+	std::cerr << modname << "\n";
 #endif
 
-	AbstractNode *node = ctx->instantiate_module(*this, &c); // Passes c as evalctx
-	return node;
-}
+	if (!dotname.empty()) {
+		Lookup expr(dotname, location());
+		auto v = expr.evaluate(ctx);
+		if (v->isDefinedAs(Value::STRUCT)) {
+			ScopeContext sc(ctx, v->toStruct());
+			sc.setName("ModuleInstantiation", identifier());
+			return sc.instantiate_module(&ec);
+		}
+		return nullptr;
+	}
 
-std::vector<AbstractNode*> ModuleInstantiation::instantiateChildren(const Context *evalctx) const
-{
-	return this->scope.instantiateChildren(evalctx);
+	return ctx->instantiate_module(&ec);
 }
-
-std::vector<AbstractNode*> IfElseModuleInstantiation::instantiateElseChildren(const Context *evalctx) const
-{
-	return this->else_scope.instantiateChildren(evalctx);
-}
-

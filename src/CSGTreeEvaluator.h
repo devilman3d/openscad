@@ -22,8 +22,7 @@ public:
  	virtual Response visit(State &state, const class CsgOpNode &node);
  	virtual Response visit(State &state, const class TransformNode &node);
 	virtual Response visit(State &state, const class ColorNode &node);
- 	virtual Response visit(State &state, const class RenderNode &node);
- 	virtual Response visit(State &state, const class CgaladvNode &node);
+	virtual Response visit(State &state, const class BranchNode &node);
 
 	shared_ptr<class CSGNode> buildCSGTree(const AbstractNode &node);
 
@@ -41,9 +40,8 @@ private:
   void addToParent(const State &state, const AbstractNode &node);
 	void applyToChildren(State &state, const AbstractNode &node, OpenSCADOperator op);
 	shared_ptr<CSGNode> evaluateCSGNodeFromGeometry(State &state, 
-																									const shared_ptr<const class Geometry> &geom,
-																									const class ModuleInstantiation *modinst, 
-																									const AbstractNode &node);
+													const shared_ptr<const class Geometry> &geom,
+													const AbstractNode &node);
 	void applyBackgroundAndHighlight(State &state, const AbstractNode &node);
 
   const AbstractNode *root;
@@ -57,4 +55,5 @@ protected:
 	std::vector<shared_ptr<CSGNode>> highlightNodes;
 	std::vector<shared_ptr<CSGNode>> backgroundNodes;
 	std::map<int, shared_ptr<CSGNode>> stored_term; // The term evaluated from each node index
+	std::map<int, State> stored_state;				// the state stored for each node index
 };

@@ -19,8 +19,8 @@ CGAL_Nef_polyhedron *import_nef3(const std::string &filename)
 		return N;
 	}
 
-	N->p3.reset(new CGAL_Nef_polyhedron3);
-	f >> *(N->p3);
+	N->reset(new CGAL_Nef_polyhedron3);
+	f >> **N;
 	return N;
 }
 #endif

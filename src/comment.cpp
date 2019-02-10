@@ -1,5 +1,6 @@
 #include "comment.h"
 #include "expression.h"
+#include "expressions.h"
 #include "annotation.h"
 #include <string>
 #include <vector>
@@ -273,45 +274,48 @@ void CommentParser::collectParameters(const char *fulltext, FileModule *root_mod
 	GroupList groupList = collectGroups(std::string(fulltext));
 	int parseTill=getLineToStop(fulltext);
 	// Extract parameters for all literal assignments
-	for (auto &assignment : root_module->scope.assignments) {
-		if (!assignment.expr.get()->isLiteral()) continue; // Only consider literals
+	for (auto &d : root_module->scope.orderedDefinitions) {
+		if (auto assignment = dynamic_pointer_cast<Expression>(d.node)) {
+			if (!assignment->isLiteral()) continue; // Only consider literals
 
-		// get location of assignment node
-		int firstLine = assignment.location().firstLine();
-		if(firstLine>=parseTill ) continue;
+			// get location of assignment node
+			int firstLine = assignment->location().firstLine();
+			if (firstLine >= parseTill) continue;
 
-		// making list to add annotations
-		AnnotationList *annotationList = new AnnotationList();
- 
-		// Extracting the parameter comment
-		std::string comment = getComment(std::string(fulltext), firstLine);
-		// getting the node for parameter annnotataion
-		shared_ptr<Expression> params = CommentParser::parser(comment.c_str());
-		if (!params) {
-			params = shared_ptr<Expression>(new Literal(ValuePtr(std::string(""))));
+			// making list to add annotations
+			AnnotationList *annotationList = new AnnotationList();
+
+			// Extracting the parameter comment
+			std::string comment = getComment(std::string(fulltext), firstLine);
+			// getting the node for parameter annnotataion
+			shared_ptr<Expression> params = CommentParser::parser(comment.c_str());
+			if (!params) {
+				params = shared_ptr<Expression>(new Literal(ValuePtr(std::string(""))));
+			}
+
+			// adding parameter to the list
+			annotationList->push_back(Annotation("Parameter", params));
+
+			//extracting the description
+			std::string descr = getDescription(std::string(fulltext), firstLine - 1);
+			if (descr != "") {
+				//creating node for description
+				shared_ptr<Expression> expr(new Literal(ValuePtr(std::string(descr.c_str()))));
+				annotationList->push_back(Annotation("Description", expr));
+			}
+
+			// Look for the group to which the given assignment belong
+			int i = 0;
+			for (; i < groupList.size() && groupList[i].lineNo < firstLine; i++);
+			i--;
+
+			if (i >= 0) {
+				//creating node for description
+				shared_ptr<Expression> expr(new Literal(ValuePtr(groupList[i].commentString)));
+				annotationList->push_back(Annotation("Group", expr));
+			}
+			// todo: fix this
+			//assignment->addAnnotations(annotationList);
 		}
-
-		// adding parameter to the list
-		annotationList->push_back(Annotation("Parameter", params));
-
-		//extracting the description
-		std::string descr = getDescription(std::string(fulltext), firstLine - 1);
-		if (descr != "") {
-			//creating node for description
-			shared_ptr<Expression> expr(new Literal(ValuePtr(std::string(descr.c_str()))));
-			annotationList->push_back(Annotation("Description", expr));
-		}
-
-		// Look for the group to which the given assignment belong
-		int i=0;
-		for (;i<groupList.size() && groupList[i].lineNo<firstLine;i++);
-		i--;
-
-		if (i >= 0) {
-			//creating node for description
-			shared_ptr<Expression> expr(new Literal(ValuePtr(groupList[i].commentString)));
-			annotationList->push_back(Annotation("Group", expr));
-		}
-		assignment.addAnnotations(annotationList);
 	}
 }

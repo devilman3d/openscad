@@ -35,34 +35,20 @@
 
 #include <sstream>
 
-std::deque<std::string> UserModule::module_stack;
-
-AbstractNode *UserModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const
+// ctx = this module's lexical container: parent scope
+// evalctx = eval context: parent = original caller, contains inst's args and scope; only ever used if children() is called later
+AbstractNode *UserModule::instantiate(const Context *ctx, const ModuleContext *evalctx) const
 {
 	if (StackCheck::inst()->check()) {
-		throw RecursionException::create("module", inst->name());
+		throw RecursionException::create("module", evalctx->name());
 		return NULL;
 	}
-
-	// At this point we know that nobody will modify the dependencies of the local scope
-	// passed to this instance, so we can populate the context
-	inst->scope.apply(*evalctx);
     
-	ModuleContext c(ctx, evalctx);
-	// set $children first since we might have variables depending on it
-	c.set_variable("$children", ValuePtr(double(inst->scope.children.size())));
-	module_stack.push_back(inst->name());
-	c.set_variable("$parent_modules", ValuePtr(double(module_stack.size())));
-	c.initializeModule(*this);
-	// FIXME: Set document path to the path of the module
-#if 0 && DEBUG
-	c.dump(this, inst);
-#endif
+	UserContext uc(ctx, this, evalctx);
+	uc.setName("UserModule", evalctx->name());
 
-	AbstractNode *node = new GroupNode(inst);
-	std::vector<AbstractNode *> instantiatednodes = this->scope.instantiateChildren(&c);
-	node->children.insert(node->children.end(), instantiatednodes.begin(), instantiatednodes.end());
-	module_stack.pop_back();
+	AbstractNode *node = GroupNode::create(evalctx->flags());
+	this->scope.evaluate(uc, node->getChildren());
 
 	return node;
 }

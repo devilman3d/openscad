@@ -25,63 +25,46 @@
  */
 
 #include "node.h"
+#include "context.h"
+#include "evalcontext.h"
 #include "module.h"
 #include "ModuleInstantiation.h"
 #include "progress.h"
 #include "stl-utils.h"
+#include "value.h"
+#include "Geometry.h"
+
+#include "cgal.h"
+#include "cgalutils.h"
+#include "CGAL_Nef_polyhedron.h"
 
 #include <iostream>
 #include <algorithm>
 
-size_t AbstractNode::idx_counter;
+size_t AbstractNode::idx_counter(1);
 
-AbstractNode::AbstractNode(const ModuleInstantiation *mi)
+AbstractNode::AbstractNode()
+	: /*parent(nullptr)
+	, */nodeFlags(NodeFlags::None)
+	, idx(idx_counter++)
 {
-	modinst = mi;
-	idx = idx_counter++;
 }
 
 AbstractNode::~AbstractNode()
 {
-	std::for_each(this->children.begin(), this->children.end(), del_fun<AbstractNode>());
+}
+
+size_t AbstractNode::indexOfChild(const AbstractNode *child) const
+{
+	for (int i = 0; i < children.size(); ++i)
+		if (children[i].get() == child)
+			return i;
+	return -1;
 }
 
 std::string AbstractNode::toString() const
 {
 	return this->name() + "()";
-}
-
-std::string GroupNode::name() const
-{
-	return "group";
-}
-
-std::string RootNode::name() const
-{
-	return "root";
-}
-
-std::string AbstractIntersectionNode::toString() const
-{
-	return this->name() + "()";
-}
-
-std::string AbstractIntersectionNode::name() const
-{
-  // We write intersection here since the module will have to be evaluated
-	// before we get here and it will not longer retain the intersection_for parameters
-	return "intersection";
-}
-
-void AbstractNode::progress_prepare()
-{
-	std::for_each(this->children.begin(), this->children.end(), std::mem_fun(&AbstractNode::progress_prepare));
-	this->progress_mark = ++progress_report_count;
-}
-
-void AbstractNode::progress_report() const
-{
-	progress_update(this, this->progress_mark);
 }
 
 std::ostream &operator<<(std::ostream &stream, const AbstractNode &node)
@@ -91,12 +74,13 @@ std::ostream &operator<<(std::ostream &stream, const AbstractNode &node)
 }
 
 // Do we have an explicit root node (! modifier)?
-AbstractNode *find_root_tag(AbstractNode *n)
+const AbstractNode *find_root_tag(const AbstractNode *n)
 {
-  for(auto v : n->children) {
-    if (v->modinst->tag_root) return v;
-    if (auto vroot = find_root_tag(v)) return vroot;
+  for(auto &v : n->getChildren()) {
+    if (v->isRoot()) 
+		return v.get();
+    if (auto vroot = find_root_tag(v.get())) 
+		return vroot;
   }
-  return NULL;
+  return nullptr;
 }
-

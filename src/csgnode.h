@@ -74,6 +74,8 @@ public:
 	Transform3d matrix;
 	Color4f color;
 
+	bool isMirrorMatrix() const { return matrix.matrix().determinant() < 0; }
+
 	friend class CSGProducts;
 };
 

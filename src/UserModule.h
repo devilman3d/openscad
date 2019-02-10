@@ -5,23 +5,17 @@
 
 #include "module.h"
 #include "localscope.h"
+#include "Assignment.h"
 
 class UserModule : public AbstractModule, public ASTNode
 {
 public:
-	UserModule(const Location &loc) : ASTNode(loc) { }
-	UserModule(const class Feature& feature, const Location &loc) : AbstractModule(feature), ASTNode(loc) { }
-	virtual ~UserModule() {}
+	UserModule(const std::string &name, const AssignmentList &args, const Location &loc) : ASTNode(loc), name(name), definition_arguments(args) { }
 
-	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx = NULL) const;
+	virtual AbstractNode *instantiate(const Context *ctx, const ModuleContext *evalctx) const;
 	virtual std::string dump(const std::string &indent, const std::string &name) const;
-	static const std::string& stack_element(int n) { return module_stack[n]; };
-	static int stack_size() { return module_stack.size(); };
 
+	std::string name;
 	AssignmentList definition_arguments;
-
 	LocalScope scope;
-
-private:
-	static std::deque<std::string> module_stack;
 };

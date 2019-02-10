@@ -8,25 +8,19 @@
 #include "localscope.h"
 #include "exceptions.h"
 
-EvalContext::EvalContext(const Context *parent, 
-												 const AssignmentList &args, const class LocalScope *const scope)
-	: Context(parent), eval_arguments(args), scope(scope)
+const std::string &EvalArguments::getArgName(size_t i) const
 {
+	assert(i < eval_arguments.size());
+	return eval_arguments[i].name;
 }
 
-const std::string &EvalContext::getArgName(size_t i) const
+ValuePtr EvalArguments::getArgValue(size_t i, const Context *ctx) const
 {
-	assert(i < this->eval_arguments.size());
-	return this->eval_arguments[i].name;
-}
-
-ValuePtr EvalContext::getArgValue(size_t i, const Context *ctx) const
-{
-	assert(i < this->eval_arguments.size());
-	const Assignment &arg = this->eval_arguments[i];
+	assert(i < eval_arguments.size());
+	const Assignment &arg = eval_arguments[i];
 	ValuePtr v;
 	if (arg.expr) {
-		v = arg.expr->evaluate(ctx ? ctx : this);
+		v = arg.expr->evaluate(ctx ? ctx : getEvalContext());
 	}
 	return v;
 }
@@ -35,7 +29,7 @@ ValuePtr EvalContext::getArgValue(size_t i, const Context *ctx) const
   Resolves arguments specified by evalctx, using args to lookup positional arguments.
   Returns an AssignmentMap (string -> Expression*)
 */
-AssignmentMap EvalContext::resolveArguments(const AssignmentList &args) const
+AssignmentMap EvalArguments::resolveArguments(const AssignmentList &args) const
 {
   AssignmentMap resolvedArgs;
   size_t posarg = 0;
@@ -52,35 +46,34 @@ AssignmentMap EvalContext::resolveArguments(const AssignmentList &args) const
   return resolvedArgs;
 }
 
-size_t EvalContext::numChildren() const
+EvalContext::EvalContext(const Context *parent, const AssignmentList &args)
+	: Context(parent), EvalArguments(args)
 {
-	return this->scope ? this->scope->children.size() : 0;
-}
-
-ModuleInstantiation *EvalContext::getChild(size_t i) const
-{
-	return this->scope ? this->scope->children[i] : NULL; 
+	setType<EvalContext>();
 }
 
 void EvalContext::assignTo(Context &target) const
 {
-	for(const auto &assignment : this->eval_arguments) {
-		ValuePtr v;
-		if (assignment.expr) v = assignment.expr->evaluate(&target);
-		if (target.has_local_variable(assignment.name)) {
-			PRINTB("WARNING: Ignoring duplicate variable assignment %s = %s", assignment.name % v->toString());
-		} else {
-			target.set_variable(assignment.name, v);
+	for(const auto &assignment : eval_arguments) {
+		if (!assignment.name.empty()) {
+			ValuePtr v;
+			if (assignment.expr) v = assignment.expr->evaluate(&target);
+			if (target.has_local_variable(assignment.name)) {
+				PRINTB("WARNING: Ignoring duplicate variable assignment %s = %s", assignment.name % v->toString());
+			}
+			else {
+				target.set_variable(assignment.name, v);
+			}
 		}
 	}
 }
 
-std::ostream &operator<<(std::ostream &stream, const EvalContext &ec)
+std::ostream &operator<<(std::ostream &stream, const EvalArguments &ec)
 {
 	for (size_t i = 0; i < ec.numArgs(); i++) {
 		if (i > 0) stream << ", ";
 		if (!ec.getArgName(i).empty()) stream << ec.getArgName(i) << " = ";
-		ValuePtr val = ec.getArgValue(i);
+		ValuePtr val = ec.getArgValue(i, nullptr);
 		stream << val->toEchoString();
 	}
 	return stream;
@@ -118,4 +111,3 @@ std::string EvalContext::dump(const AbstractModule *mod, const ModuleInstantiati
 	return s.str();
 }
 #endif
-

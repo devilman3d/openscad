@@ -34,6 +34,10 @@
 #include "builtin.h"
 #include "calc.h"
 #include "polyset.h"
+#include "value.h"
+#include "clipper-utils.h"
+#include "FactoryNode.h"
+#include "maybe_const.h"
 
 #include <sstream>
 #include <boost/assign/std/vector.hpp>
@@ -42,74 +46,65 @@ using namespace boost::assign; // bring 'operator+=()' into scope
 #include <boost/filesystem.hpp>
 namespace fs = boost::filesystem;
 
-class OffsetModule : public AbstractModule
+class OffsetNode : public FactoryNode
 {
 public:
-	OffsetModule() { }
-	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const;
+	OffsetNode() : FactoryNode(
+		"r", "delta", "chamfer",
+		"$fn", "$fs", "$fa")
+		, fn(0), fs(0), fa(0), delta(1), miter_limit(1000000.0), join_type(ClipperLib::jtRound) { }
+
+	bool chamfer;
+	double fn, fs, fa, delta;
+	double miter_limit; // currently fixed high value to disable chamfers with jtMiter
+	ClipperLib::JoinType join_type;
+
+	void initialize(Context &c, const ModuleContext &evalctx) override
+	{
+		this->fn = c.lookup_variable("$fn")->toDouble();
+		this->fs = c.lookup_variable("$fs")->toDouble();
+		this->fa = c.lookup_variable("$fa")->toDouble();
+
+		// default with no argument at all is (r = 1, chamfer = false)
+		// radius takes precedence if both r and delta are given.
+		this->delta = 1;
+		this->chamfer = false;
+		this->join_type = ClipperLib::jtRound;
+		const ValuePtr r = c.lookup_variable("r", true);
+		const ValuePtr delta = c.lookup_variable("delta", true);
+		const ValuePtr chamfer = c.lookup_variable("chamfer", true);
+
+		if (r->isDefinedAs(Value::NUMBER)) {
+			r->getDouble(this->delta);
+		}
+		else if (delta->isDefinedAs(Value::NUMBER)) {
+			delta->getDouble(this->delta);
+
+			this->join_type = ClipperLib::jtMiter;
+			if (chamfer->isDefinedAs(Value::BOOL) && chamfer->toBool()) {
+				this->chamfer = true;
+				this->join_type = ClipperLib::jtSquare;
+			}
+		}
+	}
+
+	virtual ResultObject processChildren(const NodeGeometries &children) const
+	{
+		Polygon2ds dim2;
+		GeomUtils::collect(children, dim2);
+		ClipperUtils _union;
+		if (auto geometry = maybe_const<Polygon2d>(_union.apply(dim2, ClipperLib::ClipType::ctUnion))) {
+			// ClipperLib documentation: The formula for the number of steps in a full
+			// circular arc is ... Pi / acos(1 - arc_tolerance / abs(delta))
+			double n = Calc::get_fragments_from_r(std::abs(this->delta), this->fn, this->fs, this->fa);
+			double arc_tolerance = std::abs(this->delta) * (1 - cos(M_PI / n));
+			ClipperUtils utils;
+			auto result = maybe_const<Geometry>(utils.applyOffset(*geometry, this->delta, this->join_type, this->miter_limit, arc_tolerance));
+			assert(result);
+			return ResultObject(result);
+		}
+		return ResultObject(new EmptyGeometry());
+	}
 };
 
-AbstractNode *OffsetModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const
-{
-	OffsetNode *node = new OffsetNode(inst);
-
-	AssignmentList args;
-	args += Assignment("r");
-
-	Context c(ctx);
-	c.setVariables(args, evalctx);
-	inst->scope.apply(*evalctx);
-
-	node->fn = c.lookup_variable("$fn")->toDouble();
-	node->fs = c.lookup_variable("$fs")->toDouble();
-	node->fa = c.lookup_variable("$fa")->toDouble();
-
-	// default with no argument at all is (r = 1, chamfer = false)
-	// radius takes precedence if both r and delta are given.
-	node->delta = 1;
-	node->chamfer = false;
-	node->join_type = ClipperLib::jtRound;
-	const ValuePtr r = c.lookup_variable("r", true);
-	const ValuePtr delta = c.lookup_variable("delta", true);
-	const ValuePtr chamfer = c.lookup_variable("chamfer", true);
-	
-	if (r->isDefinedAs(Value::NUMBER)) {
-	    r->getDouble(node->delta);
-	} else if (delta->isDefinedAs(Value::NUMBER)) {
-	    delta->getDouble(node->delta);
-
-	    node->join_type = ClipperLib::jtMiter;
-	    if (chamfer->isDefinedAs(Value::BOOL) && chamfer->toBool()) {
-		node->chamfer = true;
-		node->join_type = ClipperLib::jtSquare;
-	    }
-	}
-	
-	std::vector<AbstractNode *> instantiatednodes = inst->instantiateChildren(evalctx);
-	node->children.insert(node->children.end(), instantiatednodes.begin(), instantiatednodes.end());
-
-	return node;
-}
-
-std::string OffsetNode::toString() const
-{
-	std::stringstream stream;
-
-	bool isRadius = this->join_type == ClipperLib::jtRound;
-	const char *var = isRadius ? "(r = " : "(delta = ";
-
-	stream  << this->name() << var << std::dec << this->delta;
-	if (!isRadius) {
-	    stream << ", chamfer = " << (this->chamfer ? "true" : "false");
-	}
-	stream  << ", $fn = " << this->fn
-		<< ", $fa = " << this->fa
-		<< ", $fs = " << this->fs << ")";
-
-	return stream.str();
-}
-
-void register_builtin_offset()
-{
-	Builtins::init("offset", new OffsetModule());
-}
+FactoryModule<OffsetNode> OffsetNodeFactory("offset");

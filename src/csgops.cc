@@ -31,53 +31,231 @@
 #include "ModuleInstantiation.h"
 #include "csgnode.h"
 #include "builtin.h"
+#include "Geometry.h"
 #include <sstream>
 #include <assert.h>
 
-class CsgModule : public AbstractModule
+#include "cgal.h"
+#include "cgalutils.h"
+#include <CGAL/Surface_mesh.h>
+#include <CGAL/Polygon_mesh_processing/corefinement.h>
+
+#include "PolyMesh.h"
+
+#include "FactoryModule.h"
+#include "FactoryNode.h"
+
+template <OpenSCADOperator OP>
+class CsgOpFactoryNode : public CsgOpNode
 {
 public:
-	OpenSCADOperator type;
-	CsgModule(OpenSCADOperator type) : type(type) { }
-	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const;
+	CsgOpFactoryNode() : CsgOpNode(OP) { }
+
+	bool preferNef() const override { return true; }
+
+	bool needsConversion(const NodeHandles &nodes) const
+	{
+		for (auto &node : nodes) {
+			if (needsConversion(node))
+				return true;
+		}
+		return false;
+	}
+
+	bool needsConversion(const NodeHandle &node) const
+	{
+		if (auto fn = dynamic_pointer_cast<FactoryNode>(node)) {
+			if (fn->preferPoly())
+				return true;
+			if (fn->preferNef())
+				return false;
+		}
+		return needsConversion(node->getChildren());
+	}
+	
+	void addChild(const Context &c, const NodeHandle &child) override
+	{
+		if (needsConversion(child)) {
+			auto nefNode = NefNode::create(this->nodeFlags);
+			nefNode->addChild(c, child);
+			nefNode->setLocals(c);
+			CsgOpNode::addChild(c, NodeHandle(nefNode));
+		}
+		else
+			CsgOpNode::addChild(c, child);
+	}
+
+	virtual ResultObject processChildren(const NodeGeometries &children) const
+	{
+		return GeomUtils::apply(children, this->type);
+	}
 };
 
-AbstractNode *CsgModule::instantiate(const Context*, const ModuleInstantiation *inst, EvalContext *evalctx) const
-{
-	inst->scope.apply(*evalctx);
-	CsgOpNode *node = new CsgOpNode(inst, type);
-	std::vector<AbstractNode *> instantiatednodes = inst->instantiateChildren(evalctx);
-	node->children.insert(node->children.end(), instantiatednodes.begin(), instantiatednodes.end());
-	return node;
-}
+class UnionNode : public CsgOpFactoryNode<OpenSCADOperator::OPENSCAD_UNION> {};
+FactoryModule<UnionNode> UnionNodeFactory("union");
 
-std::string CsgOpNode::toString() const
-{
-	return this->name() + "()";
-}
+class DifferenceNode : public CsgOpFactoryNode<OpenSCADOperator::OPENSCAD_DIFFERENCE> {};
+FactoryModule<DifferenceNode> DifferenceNodeFactory("difference");
 
-std::string CsgOpNode::name() const
+class IntersectionNode : public CsgOpFactoryNode<OpenSCADOperator::OPENSCAD_INTERSECTION> {};
+FactoryModule<IntersectionNode> IntersectionNodeFactory("intersection");
+
+// -------------------------------------------------
+// CGAL corefine operations
+// -------------------------------------------------
+
+namespace PMP = CGAL::Polygon_mesh_processing;
+
+class CorefineUnionNode : public FactoryNode
 {
-	switch (this->type) {
-	case OPENSCAD_UNION:
-		return "union";
-		break;
-	case OPENSCAD_DIFFERENCE:
-		return "difference";
-		break;
-	case OPENSCAD_INTERSECTION:
-		return "intersection";
-		break;
-	default:
-		assert(false);
+public:
+	CorefineUnionNode() : first(nullptr) { }
+
+	virtual ResultObject visitChild(shared_ptr<const CGAL_Nef_polyhedron> nef) const
+	{
+		if (auto ps = CGALUtils::createPolySetFromNefPolyhedron(*nef))
+			return visitChild(PolySetHandle(ps));
+		return ResultObject(new EmptyGeometry());
 	}
-	return "internal_error";
-}
 
-void register_builtin_csgops()
+	virtual ResultObject visitChild(shared_ptr<const PolySet> ps) const
+	{
+		auto mesh = std::make_shared<PolyMesh>(*ps);
+		// main object
+		if (!first) {
+			first = mesh;
+			return ResultObject(first);
+		}
+		// difference objects
+		PolyMesh::Mesh temp;
+		if (PMP::corefine_and_compute_union(first->getMesh(), mesh->getMesh(), temp)) {
+			auto ptemp = new PolyMesh(temp);
+			first.reset(ptemp);
+		}
+		else
+			PRINT("WARNING: Error computing corefine union");
+		return ResultObject(first);
+	}
+
+	virtual ResultObject processChildren(const NodeGeometries &children) const
+	{
+		visitChildren(children);
+		if (first)
+			return ResultObject(new PolyMesh(*first));
+		return ResultObject(new PolySet(3));
+	}
+
+	mutable shared_ptr<PolyMesh> first;
+};
+
+FactoryModule<CorefineUnionNode> CorefineUnionNodeFactory("cunion");
+
+class CorefineDifferenceNode : public FactoryNode
 {
-	Builtins::init("union", new CsgModule(OPENSCAD_UNION));
-	Builtins::init("difference", new CsgModule(OPENSCAD_DIFFERENCE));
-	Builtins::init("intersection", new CsgModule(OPENSCAD_INTERSECTION));
-}
+public:
+	CorefineDifferenceNode() : first(nullptr) { }
 
+	virtual ResultObject visitChild(shared_ptr<const CGAL_Nef_polyhedron> nef) const
+	{
+		if (auto ps = CGALUtils::createPolySetFromNefPolyhedron(*nef))
+			return visitChild(PolySetHandle(ps));
+		return ResultObject(new EmptyGeometry());
+	}
+
+	virtual ResultObject visitChild(shared_ptr<const PolySet> ps) const
+	{
+		auto mesh = std::make_shared<PolyMesh>(*ps);
+		mesh->validate();
+		// main object
+		if (first) {
+			// difference objects
+			if (CGAL::Polygon_mesh_processing::does_self_intersect(first->getMesh()))
+				PRINT("WARNING: first mesh is self intersecting");
+			if (CGAL::Polygon_mesh_processing::does_self_intersect(mesh->getMesh()))
+				PRINT("WARNING: difference mesh is self intersecting");
+			if (!CGAL::Polygon_mesh_processing::does_bound_a_volume(first->getMesh()))
+				PRINT("WARNING: first mesh does not bound a volume");
+			if (!CGAL::Polygon_mesh_processing::does_bound_a_volume(mesh->getMesh()))
+				PRINT("WARNING: difference mesh does not bound a volume");
+			PolyMesh::Mesh temp;
+			if (PMP::corefine_and_compute_difference(first->getMesh(), mesh->getMesh(), temp)) {
+				auto ptemp = new PolyMesh(temp);
+				first.reset(ptemp);
+			}
+			else
+				PRINT("WARNING: Error computing corefine difference");
+		}
+		else
+			first = mesh;
+		return ResultObject(first);
+	}
+
+	virtual ResultObject processChildren(const NodeGeometries &children) const
+	{
+		visitChildren(children);
+		if (first)
+			return ResultObject(new PolyMesh(*first));
+		return ResultObject(new PolySet(3));
+	}
+
+	mutable shared_ptr<PolyMesh> first;
+};
+
+FactoryModule<CorefineDifferenceNode> CorefineDifferenceNodeFactory("cdifference");
+
+class CorefineIntersectionNode : public FactoryNode
+{
+public:
+	CorefineIntersectionNode() { }
+
+	virtual ResultObject visitChild(shared_ptr<const CGAL_Nef_polyhedron> nef) const
+	{
+		if (auto ps = CGALUtils::createPolySetFromNefPolyhedron(*nef))
+			return visitChild(PolySetHandle(ps));
+		return ResultObject(new EmptyGeometry());
+	}
+
+	virtual ResultObject visitChild(shared_ptr<const PolySet> ps) const
+	{
+		auto mesh = std::make_shared<PolyMesh>(*ps);
+		// main object
+		if (!first) {
+			first = mesh;
+			return ResultObject(first);
+		}
+		// first intersected object
+		if (!second) {
+			second = mesh;
+			return ResultObject(second);
+		}
+		// union subsequent intersected objects
+		PolyMesh::Mesh temp;
+		if (PMP::corefine_and_compute_union(second->getMesh(), mesh->getMesh(), temp)) {
+			auto ptemp = new PolyMesh(temp);
+			second.reset(ptemp);
+		}
+		else
+			PRINT("WARNING: Error computing corefine union for intersection");
+		return ResultObject(second);
+	}
+
+	virtual ResultObject processChildren(const NodeGeometries &children) const
+	{
+		visitChildren(children);
+		if (!second) {
+			return ResultObject(new PolyMesh(*first));
+		}
+		PolyMesh::Mesh result;
+		if (PMP::corefine_and_compute_intersection(first->getMesh(), second->getMesh(), result)) {
+			return ResultObject(new PolyMesh(result));
+		}
+		else
+			PRINT("WARNING: Error computing corefine intersection");
+		return ResultObject(new PolySet(3));
+	}
+
+	mutable shared_ptr<PolyMesh> first;
+	mutable shared_ptr<PolyMesh> second;
+};
+
+FactoryModule<CorefineIntersectionNode> CorefineIntersectionNodeFactory("cintersection");

@@ -5,6 +5,7 @@
 #include "printutils.h"
 #include "polyset-utils.h"
 #include "grid.h"
+#include "progress.h"
 
 #include "cgal.h"
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
@@ -41,14 +42,15 @@ namespace /* anonymous */ {
 */
 #if 1 // Use Grid
 		void operator()(HDS& hds) {
+			LocalProgress progress("PolySet->Nef");
 			CGAL_Polybuilder B(hds, true);
-		
+
 			Grid3d<int> grid(GRID_FINE);
 			std::vector<CGALPoint> vertices;
 			std::vector<std::vector<size_t>> indices;
 
 			// Align all vertices to grid and build vertex array in vertices
-			for(const auto &p : ps.polygons) {
+			for (const auto &p : ps.getPolygons()) {
 				indices.push_back(std::vector<size_t>());
 				indices.back().reserve(p.size());
 				for (auto v : boost::adaptors::reverse(p)) {
@@ -62,15 +64,18 @@ namespace /* anonymous */ {
 				}
 			}
 
+			progress.setCount(vertices.size() + indices.size());
+
 #ifdef GEN_SURFACE_DEBUG
 			printf("polyhedron(faces=[");
 			int pidx = 0;
 #endif
-			B.begin_surface(vertices.size(), ps.polygons.size());
-			for(const auto &p : vertices) {
+			B.begin_surface(vertices.size(), ps.getPolygons().size());
+			for (const auto &p : vertices) {
 				B.add_vertex(p);
+				progress.tick();
 			}
-			for(auto &pindices : indices) {
+			for (auto &pindices : indices) {
 #ifdef GEN_SURFACE_DEBUG
 				if (pidx++ > 0) printf(",");
 #endif
@@ -81,9 +86,10 @@ namespace /* anonymous */ {
 				std::advance(last, -1);
 				if (*last != pindices.front()) last++; // In case the first & last are equal
 				pindices.erase(last, pindices.end());
-				if (pindices.size() >=3 && B.test_facet(pindices.begin(), pindices.end())) {
+				if (pindices.size() >= 3 && B.test_facet(pindices.begin(), pindices.end())) {
 					B.add_facet(pindices.begin(), pindices.end());
 				}
+				progress.tick();
 #ifdef GEN_SURFACE_DEBUG
 				printf("[");
 				int fidx = 0;
@@ -100,7 +106,7 @@ namespace /* anonymous */ {
 #endif
 #ifdef GEN_SURFACE_DEBUG
 			printf("points=[");
-			for (int i=0;i<vertices.size();i++) {
+			for (int i = 0; i < vertices.size(); i++) {
 				if (i > 0) printf(",");
 				const CGALPoint &p = vertices[i];
 				printf("[%g,%g,%g]", CGAL::to_double(p.x()), CGAL::to_double(p.y()), CGAL::to_double(p.z()));
@@ -184,6 +190,8 @@ namespace /* anonymous */ {
 
 		void operator()(typename Polyhedron_output::HalfedgeDS& out_hds)
 		{
+			LocalProgress progress("Nef->Nef", in_poly.size_of_vertices() + in_poly.size_of_facets());
+
 			typedef typename Polyhedron_output::HalfedgeDS Output_HDS;
 
 			CGAL::Polyhedron_incremental_builder_3<Output_HDS> builder(out_hds);
@@ -193,34 +201,38 @@ namespace /* anonymous */ {
 			typedef typename Polyhedron_input::Halfedge_around_facet_const_circulator HFCC;
 
 			builder.begin_surface(in_poly.size_of_vertices(),
-														in_poly.size_of_facets(),
-														in_poly.size_of_halfedges());
-			
+				in_poly.size_of_facets(),
+				in_poly.size_of_halfedges());
+
 			for (Vertex_const_iterator
-						vi = in_poly.vertices_begin(), end = in_poly.vertices_end();
-					vi != end ; ++vi) {
+				vi = in_poly.vertices_begin(), end = in_poly.vertices_end();
+				vi != end; ++vi) {
 				typename Polyhedron_output::Point_3 p(::CGAL::to_double(vi->point().x()),
-													  ::CGAL::to_double(vi->point().y()),
-													  ::CGAL::to_double(vi->point().z()));
+					::CGAL::to_double(vi->point().y()),
+					::CGAL::to_double(vi->point().z()));
 				builder.add_vertex(p);
+
+				progress.tick();
 			}
 
 			typedef CGAL::Inverse_index<Vertex_const_iterator> Index;
 			Index index(in_poly.vertices_begin(), in_poly.vertices_end());
 
 			for (Facet_const_iterator
-						 fi = in_poly.facets_begin(), end = in_poly.facets_end();
-					 fi != end; ++fi) {
+				fi = in_poly.facets_begin(), end = in_poly.facets_end();
+				fi != end; ++fi) {
 				HFCC hc = fi->facet_begin();
 				HFCC hc_end = hc;
 				//     std::size_t n = circulator_size(hc);
 				//     CGAL_assertion(n >= 3);
-				builder.begin_facet ();
+				builder.begin_facet();
 				do {
 					builder.add_vertex_to_facet(index[hc->vertex()]);
 					++hc;
-				} while(hc != hc_end);
+				} while (hc != hc_end);
 				builder.end_facet();
+
+				progress.tick();
 			}
 			builder.end_surface();
 		} // end operator()(..)
@@ -246,7 +258,7 @@ namespace CGALUtils {
 	bool createPolyhedronFromPolySet(const PolySet &ps, Polyhedron &p)
 	{
 		bool err = false;
-		CGALUtils::lockErrors(CGAL::THROW_EXCEPTION);
+		CGALUtils::ErrorLocker errorLocker;
 		try {
 			CGAL_Build_PolySet<Polyhedron> builder(ps);
 			p.delegate(builder);
@@ -255,7 +267,6 @@ namespace CGALUtils {
 			PRINTB("CGAL error in CGALUtils::createPolyhedronFromPolySet: %s", e.what());
 			err = true;
 		}
-		CGALUtils::unlockErrors();
 		return err;
 	}
 

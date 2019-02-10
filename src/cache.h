@@ -52,7 +52,7 @@ template <class Key, class T>
 class Cache
 {
 	struct Node {
-		inline Node() : keyPtr(0) {}
+		inline Node() : keyPtr(0), t(0), c(0), p(0), n(0) {}
 		inline Node(T *data, int cost)
 			: keyPtr(0), t(data), c(cost), p(0), n(0) {}
 		const Key *keyPtr; T *t; int c; Node *p,*n;
@@ -61,7 +61,7 @@ class Cache
 	typedef typename map_type::iterator iterator_type;
 	typedef typename map_type::value_type value_type;
 
-	std::unordered_map<Key, Node> hash;
+	map_type hash;
 	Node *f, *l;
 	void *unused;
 	int mx, total;

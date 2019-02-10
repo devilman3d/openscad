@@ -1,15 +1,15 @@
 #pragma once
 
-#include "node.h"
+#include "FactoryNode.h"
 #include "linalg.h"
 
-class ColorNode : public AbstractNode
+class ColorNode : public FactoryNode
 {
 public:
 	VISITABLE();
-	ColorNode(const ModuleInstantiation *mi) : AbstractNode(mi) { }
-	virtual std::string toString() const;
-	virtual std::string name() const;
+
+	template <typename ... Args>
+	ColorNode(Args ... args) : FactoryNode(args...) { }
 
 	Color4f color;
 };

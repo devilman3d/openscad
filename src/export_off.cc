@@ -48,7 +48,7 @@ struct IndexedMesh {
 
 static void append_geometry(const PolySet &ps, IndexedMesh &mesh)
 {
-	for(const auto &p : ps.polygons) {
+	for(const auto &p : ps.getPolygons()) {
 		for(const auto &v : p) {
 			mesh.indices.push_back(mesh.vertices.lookup(v));
 		}
@@ -60,11 +60,11 @@ static void append_geometry(const PolySet &ps, IndexedMesh &mesh)
 void append_geometry(const shared_ptr<const Geometry> &geom, IndexedMesh &mesh)
 {
 	if (const CGAL_Nef_polyhedron *N = dynamic_cast<const CGAL_Nef_polyhedron *>(geom.get())) {
-		PolySet ps(3);
-		bool err = CGALUtils::createPolySetFromNefPolyhedron3(*(N->p3), ps);
-		if (err) { PRINT("ERROR: Nef->PolySet failed"); }
-		else {
-			append_geometry(ps, mesh);
+		if (auto ps = CGALUtils::createPolySetFromNefPolyhedron(*N)) {
+			append_geometry(*PolySetHandle(ps), mesh);
+		}
+		else { 
+			PRINT("ERROR: Nef->PolySet failed"); 
 		}
 	}
 	else if (const PolySet *ps = dynamic_cast<const PolySet *>(geom.get())) {

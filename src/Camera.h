@@ -11,38 +11,64 @@ There are two different types of cameras represented in this class:
 *Gimbal camera - uses Euler Angles, object translation, and viewer distance
 *Vector camera - uses 'eye', 'center', and 'up' vectors ('lookat' style)
 
-They are not necessarily kept in sync. There are two modes of
-projection, Perspective and Orthogonal.
+Vector camera is a one-shot definition automatically converted to a 
+gimbal camera where: trans = -center; rot and dist are computed
+
+There are two modes of projection: Perspective and Orthogonal.
 
 */
 
 #include "linalg.h"
 #include <vector>
-#include <Eigen/Geometry>
+
+struct VectorCam
+{
+	// Vectorcam
+	Vector3d eye;
+	Vector3d center; // (aka 'target')
+	Vector3d up;	 // computed
+};
+
+struct GimbalCam
+{
+	// Gimbalcam
+	Vector3d object_trans;
+	Vector3d object_rot;
+	double viewer_distance;
+};
 
 class Camera
 {
 public:
 	enum CameraType { NONE, GIMBAL, VECTOR } type;
 	enum ProjectionType { ORTHOGONAL, PERSPECTIVE } projection;
+
 	Camera(enum CameraType camtype = NONE);
-	void setup(std::vector<double> params);
-	void gimbalDefaultTranslate();
+
+	void setup(const GimbalCam &params);
+	void setup(const VectorCam &params);
+
 	void setProjection(ProjectionType type);
+
+	void gimbalDefaultTranslate();
+
 	void zoom(int delta);
 	double zoomValue();
+
 	void resetView();
 	void viewAll(const BoundingBox &bbox);
+
 	std::string statusText();
 
 	// Vectorcam
-	Eigen::Vector3d eye;
-	Eigen::Vector3d center; // (aka 'target')
-	Eigen::Vector3d up; // not used currently
+	Vector3d eye;
+	Vector3d center; // (aka 'target')
+	Vector3d up; // not used currently
 
 	// Gimbalcam
-	Eigen::Vector3d object_trans;
-	Eigen::Vector3d object_rot;
+	Vector3d object_trans;
+	Vector3d object_rot;
+	double viewer_distance;
 
 	// Perspective settings
 	double fov; // Field of view
@@ -57,10 +83,4 @@ public:
 
 	unsigned int pixel_width;
 	unsigned int pixel_height;
-
-protected:
-        // Perspective settings
-	double viewer_distance;
-	// Orthographic settings
-	double height; // world-space height of viewport
 };

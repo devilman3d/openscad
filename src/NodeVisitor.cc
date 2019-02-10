@@ -5,31 +5,32 @@ State NodeVisitor::nullstate(nullptr);
 
 Response NodeVisitor::traverse(const AbstractNode &node, const State &state)
 {
-	State newstate = state;
-	newstate.setNumChildren(node.getChildren().size());
+	State nodeState = state;
+	nodeState.setNumChildren(node.getChildren().size());
+	nodeState.setPrefix(true);
 	
-	Response response = ContinueTraversal;
-	newstate.setPrefix(true);
-	newstate.setParent(state.parent());
-	response = node.accept(newstate, *this);
+	Response response = node.accept(nodeState, *this);
 
 	// Pruned traversals mean don't traverse children
 	if (response == ContinueTraversal) {
-		newstate.setParent(&node);
 		for(const auto &chnode : node.getChildren()) {
-			response = this->traverse(*chnode, newstate);
-			if (response == AbortTraversal) return response; // Abort immediately
+			State chstate = nodeState;
+			chstate.setParent(&node, nodeState);
+			response = this->traverse(*chnode, chstate);
+			if (response == AbortTraversal) 
+				break; // Abort immediately
 		}
 	}
 
 	// Postfix is executed for all non-aborted traversals
 	if (response != AbortTraversal) {
-		newstate.setParent(state.parent());
-		newstate.setPrefix(false);
-		newstate.setPostfix(true);
-		response = node.accept(newstate, *this);
+		nodeState.setPostfix(true);
+		response = node.accept(nodeState, *this);
 	}
 
-	if (response != AbortTraversal) response = ContinueTraversal;
+	// continue traversing siblings if not aborted
+	if (response != AbortTraversal) 
+		response = ContinueTraversal;
+
 	return response;
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QThread>
 #include "memory.h"
 
 class CGALWorker : public QObject
@@ -11,7 +12,7 @@ public:
 	virtual ~CGALWorker();
 
 public slots:
-	void start(const class Tree &tree);
+	void start(const class Tree &tree, class Progress &progress);
 
 protected slots:
 	void work();
@@ -21,6 +22,9 @@ signals:
 
 protected:
 
-	class QThread *thread;
-	const class Tree *tree;
+	QThread thread;
+	const Tree *tree;
+
+public:
+	Progress *progress;
 };

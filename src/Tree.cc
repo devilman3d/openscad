@@ -52,12 +52,20 @@ const std::string &Tree::getIdString(const AbstractNode &node) const
 
 		const std::string & result = this->nodeidcache.insert(node, sstream.str());
 		PRINTDB("Id Cache MISS: %s", result);
+		this->idnodecache.insert(std::make_pair(result, &node));
 		return result;
 	} else {
 		const std::string & result = this->nodeidcache[node];
 		PRINTDB("Id Cache HIT:  %s", result);
 		return result;
 	}
+}
+
+const AbstractNode &Tree::getNode(const std::string &id) const
+{
+	auto found = this->idnodecache.find(id);
+	assert(found != this->idnodecache.end());
+	return *found->second;
 }
 
 /*!

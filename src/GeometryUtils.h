@@ -3,7 +3,13 @@
 #include "linalg.h"
 #include <vector>
 
-typedef std::vector<Vector3d> Polygon;
+class Polygon : public std::vector<Vector3d>
+{
+public:
+	Polygon() : open(false) { }
+	bool open;
+};
+
 typedef std::vector<Polygon> Polygons;
 
 typedef std::vector<int> IndexedFace;
@@ -27,12 +33,12 @@ struct IndexedPolyMesh {
 
 namespace GeometryUtils {
 	bool tessellatePolygon(const Polygon &polygon,
-												 Polygons &triangles,
-												 const Vector3f *normal = NULL);
+						   Polygons &triangles,
+						   const Vector3f *normal = NULL);
 	bool tessellatePolygonWithHoles(const Vector3f *vertices,
-																	const std::vector<IndexedFace> &faces, 
-																	std::vector<IndexedTriangle> &triangles,
-																	const Vector3f *normal = NULL);
+									const std::vector<IndexedFace> &faces, 
+									std::vector<IndexedTriangle> &triangles,
+									const Vector3f *normal = NULL);
 
 	int findUnconnectedEdges(const std::vector<std::vector<IndexedFace>> &polygons);
 	int findUnconnectedEdges(const std::vector<IndexedTriangle> &triangles);

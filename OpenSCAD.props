@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+  </PropertyGroup>
+  <ItemGroup>
+    <openscad_defines Include="OPENSCAD_VERSION=2017.04.13" />
+    <openscad_defines Include="OPENSCAD_SHORTVERSION=2017.04.13" />
+    <openscad_defines Include="OPENSCAD_YEAR=2017.0" />
+    <openscad_defines Include="OPENSCAD_MONTH=04.0" />
+    <openscad_defines Include="OPENSCAD_DAY=13.0" />
+    <openscad_defines Include="ENABLE_EXPERIMENTAL" />
+    <openscad_defines Include="ENABLE_CGAL" />
+    <openscad_defines Include="ENABLE_OPENCSG" />
+    <openscad_defines Include="USE_QOPENGLWIDGET" />
+    <openscad_defines Include="USE_SCINTILLA_EDITOR" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NMakePreprocessorDefinitions>@(openscad_defines);$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <NMakeIncludeSearchPath>$(ProjectDir)src;$(ProjectDir)objects;$(ProjectDir)src\libtess2\Include;$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,295 @@
+#define __gnuc_va_list
+#define __extension__
+#define __attribute__(x)
+#define __has_builtin(x)				0
+#define __has_feature(x)				0
+#define __has_warning(x)				0
+#define inline
+#define __int128						int
+
+#define BOOST_STATIC_CONSTANT(type, assignment)
+#define BOOST_BIND_OPERATOR( op, name )
+#define BOOST_BIND_NO_PLACEHOLDERS
+
+#define BOOST_WORKAROUND(symbol, test)  0
+#define BOOST_IO_STD                    ::std::
+
+#define BOOST_ASSERT(expr)				((void)(expr))
+#define BOOST_ASSERT_MSG(expr, msg)		((void)(expr))
+#define BOOST_VERIFY(expr)				((void)(expr))
+#define BOOST_VERIFY_MSG(expr, msg)		((void)(expr))
+#define BOOST_STATIC_ASSERT_MSG( ... )
+
+#define BOOST_NOEXCEPT
+#define BOOST_NOEXCEPT_OR_NOTHROW
+#define BOOST_NOEXCEPT_IF(Predicate)
+#define BOOST_NOEXCEPT_EXPR(Expression) false
+
+#define BOOST_FALLTHROUGH				((void)0)
+
+#define BOOST_CONSTEXPR
+#define BOOST_CONSTEXPR_OR_CONST
+#define BOOST_CXX14_CONSTEXPR
+#define BOOST_ATTRIBUTE_UNUSED
+#define BOOST_STATIC_CONSTEXPR			static
+
+#define BOOST_DEDUCED_TYPENAME			typename
+
+#define BOOST_OPTIONAL_DETAIL_NO_RVALUE_REFERENCES
+#define BOOST_OPTIONAL_NO_INPLACE_FACTORY_SUPPORT
+#define BOOST_OPTIONAL_CONFIG_DONT_SPECIALIZE_OPTIONAL_REFS
+#define BOOST_OPTIONAL_DETAIL_MOVE(EXPR_) EXPR_
+
+#define BOOST_EXPLICIT_OPERATOR_BOOL()
+#define BOOST_EXPLICIT_OPERATOR_BOOL_NOEXCEPT()
+#define BOOST_CONSTEXPR_EXPLICIT_OPERATOR_BOOL()
+
+
+#define EIGEN_PARSED_BY_DOXYGEN
+
+#define eigen_assert(x)
+#define eigen_plain_assert(x)
+#define eigen_internal_assert(x)
+#define EIGEN_ONLY_USED_FOR_DEBUG(x)	(void)x
+#define EIGEN_DEPRECATED
+#define EIGEN_UNUSED
+#define EIGEN_UNUSED_VARIABLE(var)		(void)var
+#define EIGEN_DONT_INLINE
+#define EIGEN_ALWAYS_INLINE
+#define EIGEN_STRONG_INLINE
+#define EIGEN_PERMISSIVE_EXPR
+#define EIGEN_MAKESTRING2(a)			#a
+#define EIGEN_MAKESTRING(a)				#a
+#define EIGEN_COMMA						,
+#define EIGEN_CAT(a,b)					a ## b
+#define EIGEN_CAT2(a,b)					a ## b
+#define EIGEN_DEBUG_VAR(x)				EIGEN_UNUSED_VARIABLE(var)
+#define EIGEN_NO_THROW
+#define EIGEN_NO_DEBUG
+#define EIGEN_HAS_BUILTIN(x)			0
+#define EIGEN_RESTRICT
+
+#define EIGEN_PLAIN_ENUM_MIN(a,b)		a
+#define EIGEN_PLAIN_ENUM_MAX(a,b)		a
+
+#define EIGEN_GNUC_AT_LEAST(x,y)		1
+#define EIGEN_GNUC_AT_MOST(x,y)			0
+#define EIGEN_GNUC_AT(x,y)				1
+
+#define EIGEN_DECLARE_FUNCTION_ALLOWING_MULTIPLE_DEFINITIONS
+#define EIGEN_DEFINE_FUNCTION_ALLOWING_MULTIPLE_DEFINITIONS 
+
+#define ei_declare_aligned_stack_constructed_variable(TYPE,NAME,SIZE,BUFFER)
+
+#define EIGEN_USING_STD_MATH(FUNC)		using std::FUNC;
+
+#define EIGEN_ALIGNED_ALLOCA(SIZE)
+#define EIGEN_CWISE_BINARY_RETURN_TYPE(LHS,RHS,OPNAME)
+#define EIGEN_SCALAR_BINARY_SUPPORTED(OPNAME,TYPEA,TYPEB)
+#define EIGEN_MAKE_CWISE_BINARY_OP(METHOD,OPNAME)
+#define EIGEN_EXPR_BINARYOP_SCALAR_RETURN_TYPE(EXPR,SCALAR,OPNAME)
+#define EIGEN_SCALAR_BINARYOP_EXPR_RETURN_TYPE(SCALAR,EXPR,OPNAME)
+#define EIGEN_MSVC10_WORKAROUND_BINARYOP_RETURN_TYPE(X)							X
+#define EIGEN_MAKE_CWISE_COMP_OP(OP, COMPARATOR)
+#define EIGEN_MAKE_SCALAR_BINARY_OP_ONTHERIGHT(METHOD,OPNAME)
+#define EIGEN_MAKE_SCALAR_BINARY_OP_ONTHELEFT(METHOD,OPNAME)
+#define EIGEN_MAKE_SCALAR_BINARY_OP(METHOD,OPNAME)
+#define EIGEN_AUTODIFF_DECLARE_GLOBAL_UNARY(FUNC,CODE)
+
+#define EIGEN_GENERIC_PUBLIC_INTERFACE(Derived) 
+#define EIGEN_DENSE_PUBLIC_INTERFACE(Derived) 
+
+#define EIGEN_INTERNAL_DENSE_STORAGE_CTOR_PLUGIN(X)
+
+#define EIGEN_STACK_ALLOCATION_LIMIT											131072
+#define EIGEN_DEFAULT_MATRIX_STORAGE_ORDER_OPTION								Eigen::ColMajor
+#undef EIGEN_INITIALIZE_COEFFS
+
+#define EIGEN_INITIALIZE_COEFFS_IF_THAT_OPTION_IS_ENABLED
+
+#define EIGEN_EMPTY_STRUCT_CTOR(X)
+#define EIGEN_INHERIT_ASSIGNMENT_OPERATORS(Derived)
+#define EIGEN_INHERIT_ASSIGNMENT_EQUAL_OPERATOR(Derived)
+#define EIGEN_ONLY_USED_FOR_DEBUG(x) (void)x
+#define EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+#define EIGEN_MAKE_ALIGNED_OPERATOR_NEW_NOTHROW(NeedsToAlign)
+#define EIGEN_MAKE_ALIGNED_OPERATOR_NEW_IF(NeedsToAlign)
+#define EIGEN_MAKE_ALIGNED_OPERATOR_NEW_IF_VECTORIZABLE_FIXED_SIZE(Scalar,Size)
+#define EIGEN_STATIC_ASSERT(X,MSG) static_assert(X,#MSG);
+//#define EIGEN_STATIC_ASSERT_VECTOR_ONLY(TYPE) (void)0;
+//#define EIGEN_STATIC_ASSERT_FIXED_SIZE(TYPE) (void)0;
+//#define EIGEN_STATIC_ASSERT_DYNAMIC_SIZE(TYPE) (void)0;
+//#define EIGEN_STATIC_ASSERT_VECTOR_SPECIFIC_SIZE(TYPE, SIZE)					(void)0;
+//#define EIGEN_STATIC_ASSERT_MATRIX_SPECIFIC_SIZE(TYPE, ROWS, COLS)			(void)0;
+//#define EIGEN_STATIC_ASSERT_SAME_VECTOR_SIZE(TYPE0,TYPE1) (void)0;
+//#define EIGEN_PREDICATE_SAME_MATRIX_SIZE(TYPE0,TYPE1) (void)0;
+//#define EIGEN_STATIC_ASSERT_NON_INTEGER(TYPE) (void)0;
+//#define EIGEN_STATIC_ASSERT_SAME_MATRIX_SIZE(TYPE0,TYPE1) (void)0;
+//#define EIGEN_STATIC_ASSERT_SIZE_1x1(TYPE) (void)0;
+//#define EIGEN_STATIC_ASSERT_LVALUE(Derived) (void)0;
+//#define EIGEN_STATIC_ASSERT_ARRAYXPR(Derived) (void)0;
+//#define EIGEN_STATIC_ASSERT_SAME_XPR_KIND(Derived1, Derived2) (void)0;
+//#define EIGEN_INTERNAL_CHECK_COST_VALUE(C)
+#define EIGEN_VERSION_AT_LEAST(x,y,z)
+#define EIGEN_ALIGN_TO_BOUNDARY(n)
+
+#define EIGEN_THROW_X(X)           throw X
+#define EIGEN_THROW                throw
+#define EIGEN_TRY                  try
+#define EIGEN_CATCH(X)             catch (X)
+
+#define EIGEN_INCLUDE_TYPE_TRAITS
+#define EIGEN_NOEXCEPT				noexcept
+#define EIGEN_NOEXCEPT_IF(x)		noexcept(x)
+#define EIGEN_NO_THROW				noexcept(true)
+#define EIGEN_EXCEPTION_SPEC(X)		noexcept(false)
+
+#define EIGEN_SIZE_MAX(a,b)        a
+#define EIGEN_LOGICAL_XOR(a,b)     a
+#define EIGEN_IMPLIES(a,b)         a
+
+#define EIGEN_WARNINGS_DISABLED
+
+#define EIGEN_MAKE_TYPEDEFS(Type, TypeSuffix, Size, SizeSuffix)
+
+#define EIGEN_DEVICE_FUNC
+#define EIGEN_STRONG_INLINE
+#define EIGEN_DEPRECATED
+#define EIGEN_HAS_RVALUE_REFERENCES 1
+#define EIGEN_VECTORIZE             1
+#define EIGEN_IDEAL_MAX_ALIGN_BYTES 16
+#define EIGEN_MAX_ALIGN_BYTES       EIGEN_IDEAL_MAX_ALIGN_BYTES
+
+#define QT_VERSION
+#define QT_VERSION_CHECK(major, minor, patch)
+#define Q_OBJECT
+#define QDialog
+
+#define Q_DECLARE_FLAGS(Flags, Enum)
+#define Q_DECLARE_INCOMPATIBLE_FLAGS(Flags)
+#define Q_DECLARE_OPERATORS_FOR_FLAGS(Flags)
+
+#define Q_FUNC_INFO       
+#define Q_ALIGNOF(type)   
+#define Q_TYPEOF(expr)    
+#define Q_DECL_DEPRECATED 
+#define Q_DECL_ALIGN(n)   
+#define Q_DECL_UNUSED     
+#define Q_LIKELY(expr)    
+#define Q_UNLIKELY(expr)  
+#define Q_NORETURN        
+#define Q_REQUIRED_RESULT 
+#define Q_DECL_PURE_FUNCTION 
+#define Q_DECL_CONST_FUNCTION
+#define Q_DECL_NOTHROW
+#define Q_CORE_EXPORT
+#define Q_DECL_CONSTEXPR
+#define Q_DECL_RELAXED_CONSTEXPR
+#define Q_DECL_EXPORT
+#define Q_DECL_IMPORT
+#define Q_DECL_HIDDEN
+#define Q_ASSUME_IMPL(expr)
+#define Q_DECL_DEPRECATED_X(text)
+
+#define QT_ANNOTATE_CLASS(type, x)
+#define QT_ANNOTATE_CLASS2(type, a1, a2)
+#define QT_ANNOTATE_FUNCTION(x)
+#define QT_ANNOTATE_ACCESS_SPECIFIER(x)
+#define QT_NO_META_MACROS
+#define Q_SLOTS
+#define Q_SIGNALS public 
+#define Q_PRIVATE_SLOT(d, signature) 
+
+#define QT_NO_TRANSLATION
+
+#define Q_STATIC_ASSERT(Condition) 
+#define Q_STATIC_ASSERT_X(Condition, Message) 
+
+#define Q_DECL_EQ_DELETE
+
+#define QT_BEGIN_NAMESPACE
+#define QT_END_NAMESPACE
+
+#define QT_HAS_INCLUDE(x) FALSE
+
+#define QT_ASCII_CAST_WARN
+
+#define Q_NULLPTR nullptr
+
+#define Q_DECLARE_TYPEINFO_BODY(TYPE, FLAGS)
+#define Q_DECLARE_TYPEINFO(TYPE, FLAGS)
+#define Q_DECLARE_SHARED_IMPL(TYPE, FLAGS)
+#define Q_DECLARE_SHARED(TYPE)
+#define Q_DECLARE_SHARED_NOT_MOVABLE_UNTIL_QT6(TYPE)
+
+#define Q_WIDGETS_EXPORT
+
+#define slots
+
+#define Q_COMPILER_ATOMICS
+
+#define QSCINTILLA_VERSION
+
+#define Q_CORE_EXPORT
+
+#define CGAL_assertion(EX)
+#define CGAL_destructor_assertion(EX)
+#define CGAL_assertion_msg(EX,MSG)
+#define CGAL_assertion_code(CODE)
+#define CGAL_assume(EX)
+#define CGAL_assume_code(CODE)
+
+#define CGAL_For_all(ic1,ic2)
+#define CGAL_For_all_backwards(ic1,ic2)
+#define CGAL_forall_vertices(x,SNC)
+#define CGAL_forall_halfedges(x,SNC)
+#define CGAL_forall_edges(x,SNC)
+#define CGAL_forall_halffacets(x,SNC)
+#define CGAL_forall_facets(x,SNC)
+#define CGAL_forall_volumes(x,SNC)
+#define CGAL_forall_facet_cycles_of(x,F)
+#define CGAL_forall_shells_of(x,C)
+#define CGAL_forall_svertices_of(x,V)
+#define CGAL_forall_sedges_of(x,V)
+#define CGAL_forall_shalfedges_of(x,V)
+#define CGAL_forall_sfaces_of(x,V)
+
+#define CGAL_GMPFR_CONSTRUCTOR_FROM_TYPE(_type,_fun)
+#define CGAL_GMPFR_CONSTRUCTOR_FROM_OBJECT(_class,_member,_fun,_preccode)
+
+#define CGAL_GMPFR_DECLARE_OPERATORS(_type)
+#define CGAL_GMPFR_DECLARE_STATIC_FUNCTION(_f,_t1,_t2)
+#define CGAL_GMPFR_DECLARE_STATIC_FUNCTIONS(_t2)
+#define CGAL_GMPFR_DECLARE_NO_ARGUMENT_FUNCTION(_f)
+
+#define MPFR_VERSION_NUM(a,b,c)
+#define MPFR_VERSION
+
+#define CGAL_GMPFR_MEMBER_PREC()
+#define CGAL_GMPFR_MEMBER_PREC_2(_b)
+
+#define CGAL_GMPFR_OBJECT_BINARY_OPERATOR(_op,_class,_member,_fun)
+#define CGAL_GMPFR_GMPFR_BINARY_OPERATOR(_op,_fun)
+#define CGAL_GMPFR_TYPE_BINARY_OPERATOR(_op,_type,_fun)
+#define CGAL_GMPFR_ARITHMETIC_FUNCTION(_name,_fun)
+
+#define CGAL_GMPFR_PREC(_a)
+#define CGAL_GMPFR_PREC_2(_a,_b)
+#define CGAL_GMPFR_OP_GMPFR(_name,_fun)
+#define CGAL_GMPFR_NONCOMMUTATIVE_OP(_name,_type,_member,_fun)
+
+#define CGAL_GMPZF_NO_REFCOUNT
+#define CGAL_GMPZ_NO_REFCOUNT
+
+#define _GLIBCXX_VISIBILITY(x)
+#define _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
+#define _GLIBCXX_END_NAMESPACE_CONTAINER
+
+#define G_BEGIN_DECLS
+#define G_END_DECLS
+
+#define VISITABLE()
+
+#undef _WIN64
+#undef WIN64#define BOOST_TRIBOOL_THIRD_STATE(Name) inline bool Name(boost::logic::tribool x, boost::logic::detail::indeterminate_t = boost::logic::detail::indeterminate_t()) { return x.value == boost::logic::tribool::indeterminate_value; }
+#define QSCINTILLA_VERSION

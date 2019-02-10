@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <wsl_dir>C:\Users\DevMa\AppData\Local\Microsoft\Linux\Header Cache\1.0\-2064116685\usr\</wsl_dir>
+    <wsl_include>$(wsl_dir)include\</wsl_include>
+    <wsl_local>$(wsl_dir)local\</wsl_local>
+    <wsl_lib>$(wsl_dir)lib\</wsl_lib>
+    <wsl_includes>$(wsl_include)c++\7;$(wsl_include)x86_64-linux-gnu\c++\7;$(wsl_include)c++\7\backward;$(wsl_lib)gcc\x86_64-linux-gnu\7\include;$(wsl_local)include;$(wsl_lib)gcc\x86_64-linux-gnu\7\include-fixed;$(wsl_include)x86_64-linux-gnu;$(wsl_include);$(wsl_lib)x86_64-linux-gnu\glib-2.0\include\include</wsl_includes>
+    <clang_include>$(wsl_lib)llvm-6.0\lib\clang\6.0.0\include</clang_include>
+    <eigen_include>$(wsl_include)eigen3\unsupported;$(wsl_include)eigen3</eigen_include>
+    <freetype2_include>$(wsl_include)freetype2</freetype2_include>
+    <glib2_include>$(wsl_include)glib-2.0</glib2_include>
+    <glib2_lib>$(wsl_lib)glib-2.0\include</glib2_lib>
+    <harfbuzz_include>$(wsl_include)harfbuzz</harfbuzz_include>
+    <libxml2_include>$(wsl_include)libxml2</libxml2_include>
+    <qt5_dir>$(wsl_include)x86_64-linux-gnu\qt5</qt5_dir>
+    <qt5_lib>$(wsl_lib)x86_64-linux-gnu\qt5\</qt5_lib>
+    <qt5_include>$(qt5_dir);$(qt5_dir)\QtCore;$(qt5_dir)\QtWidgets;$(qt5_dir)\QtGui</qt5_include>
+    <qt5_libs>$(qt5_lib)mkspecs\linux-gcc</qt5_libs>
+    <libzip_include>$(wsl_lib)x86_64-linux-gnu\libzip\include</libzip_include>
+  </PropertyGroup>
+  <ItemGroup>
+    <wsl_defines Include="__has_include(x)=0" />
+    <wsl_defines Include="__has_warning(x)=0" />
+    <wsl_defines Include="__GLIBCXX__" />
+    <wsl_defines Include="__cplusplus=201103L" />
+    <wsl_defines Include="__GMP_DECLSPEC" />
+    <wsl_defines Include="_REENTRANT" />
+    <wsl_defines Include="ENABLE_LIBZIP" />
+    <wsl_defines Include="QT_NO_DEBUG" />
+    <wsl_defines Include="QT_PRINTSUPPORT_LIB" />
+    <wsl_defines Include="QT_WIDGETS_LIB" />
+    <wsl_defines Include="QT_GUI_LIB" />
+    <wsl_defines Include="QT_CONCURRENT_LIB" />
+    <wsl_defines Include="QT_CORE_LIB" />
+    <wsl_defines Include="QT_CORE_LIB" />
+    <wsl_defines Include="QT_WINDOWS_H" />
+    <wsl_defines Include="QSCINTILLA_VERSION=0x020903" />
+    <wsl_defines Include="EIGEN_DENSE_PUBLIC_INTERFACE(x)" />
+    <wsl_defines Include="EIGEN_DONT_VECTORIZE" />
+    <wsl_defines Include="__int128=int" />
+    <wsl_defines Include="__float128=float" />
+    <wsl_defines Include="__BEGIN_DECLS" />
+    <wsl_defines Include="__END_DECLS" />
+    <wsl_defines Include="_BITS_FLOATN_H" />
+    <wsl_defines Include="_EMMINTRIN_H_INCLUDED" />
+    <wsl_defines Include="_MMINTRIN_H_INCLUDED" />
+    <wsl_defines Include="_XMMINTRIN_H_INCLUDED" />
+    <wsl_defines Include="Q_COMPILER_ATOMICS" />
+    <wsl_defines Include="__PIC__" />
+  </ItemGroup>
+  <PropertyGroup Label="UserMacros">
+    <NMakePreprocessorDefinitions>@(wsl_defines)</NMakePreprocessorDefinitions>
+    <NMakeIncludeSearchPath>$(wsl_includes);$(clang_include);$(eigen_include);$(freetype2_include);$(glib2_include);$(harfbuzz_include);$(libxml2_include);$(qt5_include);$(glib2_lib);$(libzip_include);$(qt5_libs)</NMakeIncludeSearchPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <BuildMacro Include="wsl_dir">
+      <Value>$(wsl_dir)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+  </ItemGroup>
+</Project>

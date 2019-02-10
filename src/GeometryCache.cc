@@ -19,6 +19,19 @@ shared_ptr<const Geometry> GeometryCache::get(const std::string &id) const
 	return geom;
 }
 
+bool GeometryCache::remove(const std::string &id)
+{
+	if (cache_entry *entry = this->cache[id]) {
+		shared_ptr<const Geometry> geom = entry->geom;
+#ifdef DEBUG
+		PRINTDB("Geometry Cache remove: %s (%d bytes)", id.substr(0, 40) % (geom ? geom->memsize() : 0));
+#endif
+		this->cache.remove(id);
+		return true;
+	}
+	return false;
+}
+
 bool GeometryCache::insert(const std::string &id, const shared_ptr<const Geometry> &geom)
 {
 	bool inserted = this->cache.insert(id, new cache_entry(geom), geom ? geom->memsize() : 0);
@@ -42,7 +55,7 @@ void GeometryCache::setMaxSize(size_t limit)
 	this->cache.setMaxCost(limit);
 }
 
-void GeometryCache::print()
+void GeometryCache::print() const
 {
 	PRINTB("Geometries in cache: %d", this->cache.size());
 	PRINTB("Geometry cache size in bytes: %d", this->cache.totalCost());

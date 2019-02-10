@@ -169,11 +169,12 @@ use[ \t\r\n]*"<"	{ BEGIN(cond_use); }
 
 "module"	return TOK_MODULE;
 "function"	return TOK_FUNCTION;
+"struct"	return TOK_STRUCT;
 "if"		return TOK_IF;
 "else"		return TOK_ELSE;
 "let"		return TOK_LET;
 "assert"	return TOK_ASSERT;
-"echo"	        return TOK_ECHO;
+"echo"	    return TOK_ECHO;
 "for"		return TOK_FOR;
 "each"		return TOK_EACH;
 
@@ -219,7 +220,7 @@ use[ \t\r\n]*"<"	{ BEGIN(cond_use); }
 }
 
 [\t ]                   /* whitespace */
-[\n\r]
+[\n\r]					{ yycolumn = 1; }
 
 \/\/ BEGIN(cond_lcomment);
 <cond_lcomment>{

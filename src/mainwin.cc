@@ -45,6 +45,7 @@
 #include "dxfdim.h"
 #include "legacyeditor.h"
 #include "settings.h"
+#include "linalg.h"
 #ifdef USE_SCINTILLA_EDITOR
 #include "scintillaeditor.h"
 #endif
@@ -79,19 +80,19 @@
 #include <QFileInfo>
 #include <QTextStream>
 #include <QStatusBar>
-#include <QDropEvent>
 #include <QMimeData>
 #include <QUrl>
 #include <QTimer>
 #include <QMessageBox>
-#include <QDesktopServices>
 #include <QSettings>
 #include <QProgressDialog>
 #include <QMutexLocker>
 #include <QTemporaryFile>
 #include <QDockWidget>
-#include <QClipboard>
 #include <QDesktopWidget>
+#include <QClipboard>
+#include <QDropEvent>
+#include <QDesktopServices>
 #include <string>
 #include "QWordSearchField.h"
 
@@ -179,18 +180,25 @@ bool MainWindow::undockMode = false;
 bool MainWindow::reorderMode = false;
 
 MainWindow::MainWindow(const QString &filename)
-	: root_inst("group"), library_info_dialog(NULL), font_list_dialog(NULL), procevents(false), tempFile(NULL), progresswidget(NULL), contentschanged(false), includes_mtime(0), deps_mtime(0)
+	: top_ctx(nullptr, Builtins::getGlobalScope()), progress(this), progressTicker(this), progressTicking(false)
+	, library_info_dialog(NULL), font_list_dialog(NULL), procevents(false)
+	, tempFile(NULL), progresswidget(NULL), contentschanged(false)
+	, includes_mtime(0), deps_mtime(0)
 {
+	top_ctx.setName("MainWindow", "Builtins");
 	setupUi(this);
 
 	editorDockTitleWidget = new QWidget();
 	consoleDockTitleWidget = new QWidget();
+	objectsDockTitleWidget = new QWidget();
 	parameterDockTitleWidget = new QWidget();
 
 	this->editorDock->setConfigKey("view/hideEditor");
 	this->editorDock->setAction(this->viewActionHideEditor);
 	this->consoleDock->setConfigKey("view/hideConsole");
 	this->consoleDock->setAction(this->viewActionHideConsole);
+	this->objectsDock->setConfigKey("view/hideObjects");
+	this->objectsDock->setAction(this->viewActionHideObjects);
 	this->parameterDock->setConfigKey("view/hideCustomizer");
 	this->parameterDock->setAction(this->viewActionHideParameters);
 
@@ -236,11 +244,8 @@ MainWindow::MainWindow(const QString &filename)
 					this, SLOT(actionRenderDone(shared_ptr<const Geometry>)));
 #endif
 
-	top_ctx.registerBuiltin();
-
 	root_module = NULL;
 	parsed_module = NULL;
-	absolute_root_node = NULL;
 #ifdef ENABLE_CGAL
 	this->cgalRenderer = NULL;
 #endif
@@ -249,7 +254,9 @@ MainWindow::MainWindow(const QString &filename)
 #endif
 	this->thrownTogetherRenderer = NULL;
 
-	root_node = NULL;
+	if (absolute_root_node)
+		absolute_root_node.reset();
+	root_node = nullptr; // just a pointer
 
 	this->anim_step = 0;
 	this->anim_numsteps = 0;
@@ -290,8 +297,16 @@ MainWindow::MainWindow(const QString &filename)
 	waitAfterReloadTimer->setSingleShot(true);
 	waitAfterReloadTimer->setInterval(200);
 	connect(waitAfterReloadTimer, SIGNAL(timeout()), this, SLOT(waitAfterReload()));
+
+	progressTicker.setSingleShot(true);
+	progressTicker.setInterval(250);
+	connect(&progressTicker, SIGNAL(timeout()), this, SLOT(tickProgress()));
+
+#ifdef PARAMETER_UI
 	connect(this->parameterWidget, SIGNAL(previewRequested()), this, SLOT(actionRenderPreview()));
 	connect(Preferences::inst(), SIGNAL(ExperimentalChanged()), this, SLOT(changeParameterWidget()));
+#endif
+
 	connect(this->e_tval, SIGNAL(textChanged(QString)), this, SLOT(updatedAnimTval()));
 	connect(this->e_fps, SIGNAL(textChanged(QString)), this, SLOT(updatedAnimFps()));
 	connect(this->e_fsteps, SIGNAL(textChanged(QString)), this, SLOT(updatedAnimSteps()));
@@ -425,6 +440,7 @@ MainWindow::MainWindow(const QString &filename)
 	connect(this->viewActionHideToolBars, SIGNAL(triggered()), this, SLOT(hideToolbars()));
 	connect(this->viewActionHideEditor, SIGNAL(triggered()), this, SLOT(hideEditor()));
 	connect(this->viewActionHideConsole, SIGNAL(triggered()), this, SLOT(hideConsole()));
+	connect(this->viewActionHideObjects, SIGNAL(triggered()), this, SLOT(hideObjects()));
     connect(this->viewActionHideParameters, SIGNAL(triggered()), this, SLOT(hideParameters()));
 	// Help menu
 	connect(this->helpActionAbout, SIGNAL(triggered()), this, SLOT(helpAbout()));
@@ -443,6 +459,7 @@ MainWindow::MainWindow(const QString &filename)
 	std::string helptitle = "OpenSCAD " + openscad_versionnumber +  "\nhttp://www.openscad.org\n\n";
 	PRINT(helptitle);
 	PRINT(copyrighttext);
+	PRINTB("Settings: %s", settings.fileName().toStdString());
 	PRINT("");
 
 	if (!filename.isEmpty()) {
@@ -537,6 +554,7 @@ MainWindow::MainWindow(const QString &filename)
 
 	// fetch window states to be restored after restoreState() call
 	bool hideConsole = settings.value("view/hideConsole").toBool();
+	bool hideObjects = settings.value("view/hideObjects").toBool();
 	bool hideEditor = settings.value("view/hideEditor").toBool();
 	bool hideCustomizer = settings.value("view/hideCustomizer").toBool();
 	bool hideToolbar = settings.value("view/hideToolbar").toBool();
@@ -584,6 +602,7 @@ MainWindow::MainWindow(const QString &filename)
 	
 	connect(this->editorDock, SIGNAL(topLevelChanged(bool)), this, SLOT(editorTopLevelChanged(bool)));
 	connect(this->consoleDock, SIGNAL(topLevelChanged(bool)), this, SLOT(consoleTopLevelChanged(bool)));
+	connect(this->objectsDock, SIGNAL(topLevelChanged(bool)), this, SLOT(objectsTopLevelChanged(bool)));
 	connect(this->parameterDock, SIGNAL(topLevelChanged(bool)), this, SLOT(parameterTopLevelChanged(bool)));
 	// display this window and check for OpenGL 2.0 (OpenCSG) support
 	viewModeThrownTogether();
@@ -709,6 +728,7 @@ void MainWindow::updateUndockMode(bool undockMode)
 	if (undockMode) {
 		editorDock->setFeatures(editorDock->features() | QDockWidget::DockWidgetFloatable);
 		consoleDock->setFeatures(consoleDock->features() | QDockWidget::DockWidgetFloatable);
+		objectsDock->setFeatures(objectsDock->features() | QDockWidget::DockWidgetFloatable);
 		parameterDock->setFeatures(parameterDock->features() | QDockWidget::DockWidgetFloatable);
 	} else {
 		if (editorDock->isFloating()) {
@@ -719,6 +739,10 @@ void MainWindow::updateUndockMode(bool undockMode)
 			consoleDock->setFloating(false);
 		}
 		consoleDock->setFeatures(consoleDock->features() & ~QDockWidget::DockWidgetFloatable);
+		if (objectsDock->isFloating()) {
+			objectsDock->setFloating(false);
+		}
+		objectsDock->setFeatures(objectsDock->features() & ~QDockWidget::DockWidgetFloatable);
 		if (parameterDock->isFloating()) {
 			parameterDock->setFloating(false);
 		}
@@ -731,6 +755,7 @@ void MainWindow::updateReorderMode(bool reorderMode)
 	MainWindow::reorderMode = reorderMode;
 	editorDock->setTitleBarWidget(reorderMode ? 0 : editorDockTitleWidget);
 	consoleDock->setTitleBarWidget(reorderMode ? 0 : consoleDockTitleWidget);
+	objectsDock->setTitleBarWidget(reorderMode ? 0 : objectsDockTitleWidget);
 	parameterDock->setTitleBarWidget(reorderMode ? 0 : parameterDockTitleWidget);
 }
 
@@ -739,7 +764,9 @@ MainWindow::~MainWindow()
 	// If root_module is not null then it will be the same as parsed_module,
 	// so no need to delete it.
 	delete parsed_module;
-	delete root_node;
+	if (absolute_root_node)
+		absolute_root_node.reset();
+	root_node = nullptr; // just a pointer
 #ifdef ENABLE_CGAL
 	this->root_geom.reset();
 	delete this->cgalRenderer;
@@ -761,19 +788,57 @@ void MainWindow::showProgress()
 	updateStatusBar(qobject_cast<ProgressWidget*>(sender()));
 }
 
-void MainWindow::report_func(const class AbstractNode*, void *vp, int mark)
+void MainWindow::progress_changed()
 {
-	MainWindow *thisp = static_cast<MainWindow*>(vp);
-	int v = (int)((mark*1000.0) / progress_report_count);
-	int permille = v < 1000 ? v : 999;
-	if (permille > thisp->progresswidget->value()) {
-		QMetaObject::invokeMethod(thisp->progresswidget, "setValue", Qt::QueuedConnection,
-															Q_ARG(int, permille));
-		QApplication::processEvents();
+	if (!progressTicker.isActive()) {
+		QMetaObject::invokeMethod(&progressTicker, "start", Qt::QueuedConnection);
+	}
+	//QApplication::processEvents();
+}
+
+bool MainWindow::progress_is_canceled()
+{
+	return progresswidget->wasCanceled();
+}
+
+void MainWindow::tickProgress()
+{
+	if (!progresswidget)
+		return;
+
+	//if (progressTicking)
+	//	return;
+	//progressTicking = true;
+
+	// update main progress
+	if (progress.count.isChanged())
+		progresswidget->setRange(progress.count);
+	if (progress.value.isChanged())
+		progresswidget->setValue(progress.value);
+	// update individual cpu progress
+	int i = 0;
+	for (auto &pcd : progress.cpuData) {
+		if (pcd.isChanged()) {
+			if (auto &cpuData = pcd.value) {
+				// update data
+				progresswidget->setCpuData(cpuData->cpuId, cpuData->description, cpuData->value, cpuData->maxValue);
+			}
+			else {
+				// set idle
+				progresswidget->setIdle(i);
+			}
+		}
+		++i;
+	}
+	// update preview
+	if (cgalRenderer && cgalRenderer->getGeometry() != progress.activeGeom) {
+		cgalRenderer->setGeometry(progress.activeGeom);
+		qglview->updateGL();
 	}
 
-	// FIXME: Check if cancel was requested by e.g. Application quit
-	if (thisp->progresswidget->wasCanceled()) throw ProgressCancelException();
+	//progressTicking = false;
+
+	//QApplication::processEvents();
 }
 
 /*!
@@ -823,14 +888,17 @@ void MainWindow::setFileName(const QString &filename)
 		QFileInfo fileinfo(filename);
 		this->fileName = fileinfo.absoluteFilePath();
 		setWindowFilePath(this->fileName);
+#ifdef PARAMETER_UI
 		if (Feature::ExperimentalCustomizer.is_enabled()) {
 			this->parameterWidget->readFile(this->fileName);
         	}
+#endif
 		QDir::setCurrent(fileinfo.dir().absolutePath());
 		this->top_ctx.setDocumentPath(fileinfo.dir().absolutePath().toLocal8Bit().constData());
 	}
 	editorTopLevelChanged(editorDock->isFloating());
 	consoleTopLevelChanged(consoleDock->isFloating());
+	objectsTopLevelChanged(objectsDock->isFloating());
  	parameterTopLevelChanged(parameterDock->isFloating());
 }
 
@@ -1115,14 +1183,14 @@ void MainWindow::instantiateRoot()
 	this->thrownTogetherRenderer = NULL;
 
 	// Remove previous CSG tree
-	delete this->absolute_root_node;
-	this->absolute_root_node = NULL;
+	if (absolute_root_node)
+		absolute_root_node.reset();
+	root_node = nullptr; // just a pointer
 
 	this->csgRoot.reset();
 	this->normalizedRoot.reset();
 	this->root_products.reset();
 
-	this->root_node = NULL;
 	this->tree.setRoot(NULL);
 
 	if (this->root_module) {
@@ -1132,25 +1200,25 @@ void MainWindow::instantiateRoot()
 
 		AbstractNode::resetIndexCounter();
 
-		// split these two lines - gcc 4.7 bug
-		ModuleInstantiation mi = ModuleInstantiation( "group" );
-		this->root_inst = mi;
-
-		FileContext filectx(&top_ctx);
-		this->absolute_root_node = this->root_module->instantiateWithFileContext(&filectx, &this->root_inst, NULL);
-		this->updateCamera(filectx);
-		
-		if (this->absolute_root_node) {
-			// Do we have an explicit root node (! modifier)?
-			if (!(this->root_node = find_root_tag(this->absolute_root_node))) {
-				this->root_node = this->absolute_root_node;
+		FileContext fc(&top_ctx, *root_module);
+		fc.setName("MainWindow", "instantiateRoot");
+		auto inst_node = this->root_module->evaluate(fc);
+		if (inst_node) {
+			this->absolute_root_node.reset(inst_node);
+			if (this->absolute_root_node) {
+				// Do we have an explicit root node (! modifier)?
+				if (auto explicitRoot = find_root_tag(this->absolute_root_node.get()))
+					this->root_node = explicitRoot;
+				else
+					this->root_node = this->absolute_root_node.get();
+				// FIXME: Consider giving away ownership of root_node to the Tree, or use reference counted pointers
+				this->tree.setRoot(this->root_node);
+				// Dump the tree (to initialize caches).
+				// FIXME: We shouldn't really need to do this explicitly..
+				this->tree.getString(*this->root_node);
 			}
-			// FIXME: Consider giving away ownership of root_node to the Tree, or use reference counted pointers
-			this->tree.setRoot(this->root_node);
-			// Dump the tree (to initialize caches).
-			// FIXME: We shouldn't really need to do this explicitly..
-			this->tree.getString(*this->root_node);
 		}
+		this->updateCamera(fc);
 	}
 
 	if (!this->root_node) {
@@ -1161,121 +1229,6 @@ void MainWindow::instantiateRoot()
 		}
 		if (this->procevents) QApplication::processEvents();
 	}
-}
-
-/*!
-	Generates CSG tree for OpenCSG evaluation.
-	Assumes that the design has been parsed and evaluated (this->root_node is set)
-*/
-void MainWindow::compileCSG(bool procevents)
-{
-	assert(this->root_node);
-	PRINT("Compiling design (CSG Products generation)...");
-	if (procevents) QApplication::processEvents();
-
-	// Main CSG evaluation
-	this->progresswidget = new ProgressWidget(this);
-	connect(this->progresswidget, SIGNAL(requestShow()), this, SLOT(showProgress()));
-
-#ifdef ENABLE_CGAL
-		GeometryEvaluator geomevaluator(this->tree);
-#else
-		// FIXME: Will we support this?
-#endif
-#ifdef ENABLE_OPENCSG
-		CSGTreeEvaluator csgrenderer(this->tree, &geomevaluator);
-#endif
-
-	progress_report_prep(this->root_node, report_func, this);
-	try {
-#ifdef ENABLE_OPENCSG
-		if (procevents) QApplication::processEvents();
-		this->csgRoot = csgrenderer.buildCSGTree(*root_node);
-#endif
-		GeometryCache::instance()->print();
-#ifdef ENABLE_CGAL
-		CGALCache::instance()->print();
-#endif
-		if (procevents) QApplication::processEvents();
-	}
-	catch (const ProgressCancelException &e) {
-		PRINT("CSG generation cancelled.");
-	}
-	progress_report_fin();
-	updateStatusBar(NULL);
-
-	PRINT("Compiling design (CSG Products normalization)...");
-	if (procevents) QApplication::processEvents();
-
-	size_t normalizelimit = 2 * Preferences::inst()->getValue("advanced/openCSGLimit").toUInt();
-	CSGTreeNormalizer normalizer(normalizelimit);
-	
-	if (this->csgRoot) {
-		this->normalizedRoot = normalizer.normalize(this->csgRoot);
-		if (this->normalizedRoot) {
-			this->root_products.reset(new CSGProducts());
-			this->root_products->import(this->normalizedRoot);
-		}
-		else {
-			this->root_products.reset();
-			PRINT("WARNING: CSG normalization resulted in an empty tree");
-			if (procevents) QApplication::processEvents();
-		}
-	}
-
-	const std::vector<shared_ptr<CSGNode> > &highlight_terms = csgrenderer.getHighlightNodes();
-	if (highlight_terms.size() > 0) {
-		PRINTB("Compiling highlights (%d CSG Trees)...", highlight_terms.size());
-		if (procevents) QApplication::processEvents();
-		
-		this->highlights_products.reset(new CSGProducts());
-		for (unsigned int i = 0; i < highlight_terms.size(); i++) {
-			shared_ptr<CSGNode> nterm = normalizer.normalize(highlight_terms[i]);
-			this->highlights_products->import(nterm);
-		}
-	}
-	else {
-		this->highlights_products.reset();
-	}
-	
-	const std::vector<shared_ptr<CSGNode> > &background_terms = csgrenderer.getBackgroundNodes();
-	if (background_terms.size() > 0) {
-		PRINTB("Compiling background (%d CSG Trees)...", background_terms.size());
-		if (procevents) QApplication::processEvents();
-		
-		this->background_products.reset(new CSGProducts());
-		for (unsigned int i = 0; i < background_terms.size(); i++) {
-			shared_ptr<CSGNode> nterm = normalizer.normalize(background_terms[i]);
-			this->background_products->import(nterm);
-		}
-	}
-	else {
-		this->background_products.reset();
-	}
-
-	if (this->root_products &&
-			(this->root_products->size() >
-			 Preferences::inst()->getValue("advanced/openCSGLimit").toUInt())) {
-		PRINTB("WARNING: Normalized tree has %d elements!", this->root_products->size());
-		PRINT("WARNING: OpenCSG rendering has been disabled.");
-	}
-#ifdef ENABLE_OPENCSG
-	else {
-		PRINTB("Normalized CSG tree has %d elements",
-					 (this->root_products ? this->root_products->size() : 0));
-		this->opencsgRenderer = new OpenCSGRenderer(this->root_products,
-																								this->highlights_products,
-																								this->background_products,
-																								this->qglview->shaderinfo);
-	}
-#endif
-	this->thrownTogetherRenderer = new ThrownTogetherRenderer(this->root_products,
-																														this->highlights_products,
-																														this->background_products);
-	PRINT("Compile and preview finished.");
-	int s = this->renderingTime.elapsed() / 1000;
-	PRINTB("Total rendering time: %d hours, %d minutes, %d seconds", (s / (60*60)) % ((s / 60) % 60) % (s % 60));
-	if (procevents) QApplication::processEvents();
 }
 
 void MainWindow::actionNew()
@@ -1484,9 +1437,11 @@ void MainWindow::actionSaveAs()
 				}
 			}
 		}
+#ifdef PARAMETER_UI
 		if (Feature::ExperimentalCustomizer.is_enabled()) {
 			this->parameterWidget->writeFile(new_filename);
 		}
+#endif
 		setFileName(new_filename);
 		actionSave();
 	}
@@ -1517,17 +1472,19 @@ void MainWindow::actionReload()
 void MainWindow::pasteViewportTranslation()
 {
 	QString txt;
-	txt.sprintf("[ %.2f, %.2f, %.2f ]", -qglview->cam.object_trans.x(), -qglview->cam.object_trans.y(), -qglview->cam.object_trans.z());
+	auto trans = qglview->cam.object_trans;
+	txt.sprintf("[ %.2f, %.2f, %.2f ]", -trans.x(), -trans.y(), -trans.z());
 	this->editor->insert(txt);
 }
 
 void MainWindow::pasteViewportRotation()
 {
 	QString txt;
+	auto rot = qglview->cam.object_rot;
 	txt.sprintf("[ %.2f, %.2f, %.2f ]",
-		fmodf(360 - qglview->cam.object_rot.x() + 90, 360),
-		fmodf(360 - qglview->cam.object_rot.y(), 360),
-		fmodf(360 - qglview->cam.object_rot.z(), 360));
+		fmodf(360 - rot.x() + 90, 360),
+		fmodf(360 - rot.y(), 360),
+		fmodf(360 - rot.z(), 360));
 	this->editor->insert(txt);
 }
 
@@ -1669,21 +1626,22 @@ bool MainWindow::eventFilter(QObject* obj, QEvent *event)
 
 void MainWindow::updateTemporalVariables()
 {
-	this->top_ctx.set_variable("$t", ValuePtr(this->anim_tval));
+	top_ctx.set_variable("$t", ValuePtr(this->anim_tval));
 
-	Value::VectorType vpt;
-	vpt.push_back(ValuePtr(-qglview->cam.object_trans.x()));
-	vpt.push_back(ValuePtr(-qglview->cam.object_trans.y()));
-	vpt.push_back(ValuePtr(-qglview->cam.object_trans.z()));
-	this->top_ctx.set_variable("$vpt", ValuePtr(vpt));
+	Vector3d vpt(qglview->cam.object_trans);
+	top_ctx.set_variable("$vpt", ValuePtr(vpt));
 
-	Value::VectorType vpr;
-	vpr.push_back(ValuePtr(fmodf(360 - qglview->cam.object_rot.x() + 90, 360)));
-	vpr.push_back(ValuePtr(fmodf(360 - qglview->cam.object_rot.y(), 360)));
-	vpr.push_back(ValuePtr(fmodf(360 - qglview->cam.object_rot.z(), 360)));
+	Vector3d vpr(qglview->cam.object_rot);
 	top_ctx.set_variable("$vpr", ValuePtr(vpr));
 
-	top_ctx.set_variable("$vpd", ValuePtr(qglview->cam.zoomValue()));
+	double vpd = qglview->cam.zoomValue();
+	top_ctx.set_variable("$vpd", ValuePtr(vpd));
+
+	// reset to default
+	qglview->setupDefaultLighting();
+	// set a config variable with the default values
+	ValuePtr lights = qglview->getLightValues();
+	top_ctx.set_variable("$lights", lights);
 }
 
 
@@ -1692,55 +1650,55 @@ void MainWindow::updateTemporalVariables()
  * are assigned on top-level, the values are used to change the camera
  * rotation, translation and distance. 
  */
-void MainWindow::updateCamera(const FileContext &ctx)
+void MainWindow::updateCamera(const Context &ctx)
 {
 	bool camera_set = false;
 
 	Camera cam(qglview->cam);
-	cam.gimbalDefaultTranslate();
-	double tx = cam.object_trans.x();
-	double ty = cam.object_trans.y();
-	double tz = cam.object_trans.z();
-	double rx = cam.object_rot.x();
-	double ry = cam.object_rot.y();
-	double rz = cam.object_rot.z();
+
+	Vector3d trans(cam.object_trans);
+	Vector3d rot(cam.object_rot);
 	double d = cam.zoomValue();
 
 	double x, y, z;
-	const ValuePtr vpr = ctx.lookup_variable("$vpr");
-	if (vpr->getVec3(x, y, z)) {
-		rx = x;
-		ry = y;
-		rz = z;
-		camera_set = true;
+	if (ctx.has_local_variable("$vpr")) {
+		const ValuePtr vpr = ctx.lookup_variable("$vpr");
+		if (vpr->getVec3(x, y, z)) {
+			rot = Vector3d(x, y, z);
+			camera_set = true;
+		}
 	}
 
-	const ValuePtr vpt = ctx.lookup_variable("$vpt");
-	if (vpt->getVec3(x, y, z)) {
-		tx = x;
-		ty = y;
-		tz = z;
-		camera_set = true;
+	if (ctx.has_local_variable("$vpt")) {
+		const ValuePtr vpt = ctx.lookup_variable("$vpt");
+		if (vpt->getVec3(x, y, z)) {
+			trans = Vector3d(x, y, z);
+			camera_set = true;
+		}
 	}
 
-	const ValuePtr vpd = ctx.lookup_variable("$vpd");
-	if (vpd->type() == Value::NUMBER) {
-		d = vpd->toDouble();
-		camera_set = true;
+	if (ctx.has_local_variable("$vpd")) {
+		const ValuePtr vpd = ctx.lookup_variable("$vpd");
+		if (vpd->type() == Value::NUMBER) {
+			d = vpd->toDouble();
+			camera_set = true;
+		}
 	}
 
 	if (camera_set) {
-		std::vector<double> params;
-		params.push_back(tx);
-		params.push_back(ty);
-		params.push_back(tz);
-		params.push_back(rx);
-		params.push_back(ry);
-		params.push_back(rz);
-		params.push_back(d);
-		qglview->cam.setup(params);
-		qglview->cam.gimbalDefaultTranslate();
+		GimbalCam gc;
+		gc.object_rot = rot;
+		gc.object_trans = trans;
+		gc.viewer_distance = d;
+		qglview->cam.setup(gc);
 	}
+
+	// reset to default
+	qglview->setupDefaultLighting();
+	// get the possibly updated values
+	ValuePtr lights = ctx.lookup("$lights", true);
+	// set those values
+	qglview->setLightValues(lights);
 }
 
 /*!
@@ -1784,6 +1742,7 @@ void MainWindow::compileTopLevelDocument()
 	delete this->parsed_module;
 	this->root_module = parse(this->parsed_module, fulltext.c_str(), fs::path(fname), false) ? this->parsed_module : NULL;
 
+#ifdef PARAMETER_UI
 	if (Feature::ExperimentalCustomizer.is_enabled()) {
 		if (this->root_module!=NULL) {
 			//add parameters as annotation in AST
@@ -1792,8 +1751,10 @@ void MainWindow::compileTopLevelDocument()
 		this->parameterWidget->setParameters(this->root_module);
 		this->parameterWidget->applyParameters(this->root_module);
 	}
+#endif
 }
 
+#ifdef PARAMETER_UI
 void MainWindow::changeParameterWidget()
 {
 	if (Feature::ExperimentalCustomizer.is_enabled()) {
@@ -1806,6 +1767,7 @@ void MainWindow::changeParameterWidget()
 	}
 	emit actionRenderPreview();
 }
+#endif
 
 void MainWindow::checkAutoReload()
 {
@@ -1934,6 +1896,117 @@ void MainWindow::csgRender()
 	compileEnded();
 }
 
+/*!
+	Generates CSG tree for OpenCSG evaluation.
+	Assumes that the design has been parsed and evaluated (this->root_node is set)
+*/
+void MainWindow::compileCSG(bool procevents)
+{
+	assert(this->root_node);
+	PRINT("Compiling design (CSG Products generation)...");
+	if (procevents) QApplication::processEvents();
+
+	// Main CSG evaluation
+	this->progresswidget = new ProgressWidget(this);
+	connect(this->progresswidget, SIGNAL(requestShow()), this, SLOT(showProgress()));
+
+#ifdef ENABLE_CGAL
+	GeometryEvaluator geomevaluator(this->tree, this->progress, false, true);
+#else
+	// FIXME: Will we support this?
+#endif
+#ifdef ENABLE_OPENCSG
+	CSGTreeEvaluator csgrenderer(this->tree, &geomevaluator);
+#endif
+
+	this->progresswidget->setValue(0);
+
+	try {
+#ifdef ENABLE_OPENCSG
+		if (procevents) QApplication::processEvents();
+		this->csgRoot = csgrenderer.buildCSGTree(*root_node);
+#endif
+		GeometryCache::instance()->print();
+#ifdef ENABLE_CGAL
+		CGALCache::instance()->print();
+#endif
+		if (procevents) QApplication::processEvents();
+	}
+	catch (const ProgressCancelException &e) {
+		PRINT("CSG generation cancelled.");
+	}
+	progressTicker.stop();
+	updateStatusBar(NULL);
+
+	PRINT("Compiling design (CSG Products normalization)...");
+	if (procevents) QApplication::processEvents();
+
+	size_t normalizelimit = 2 * Preferences::inst()->getValue("advanced/openCSGLimit").toUInt();
+	CSGTreeNormalizer normalizer(normalizelimit);
+
+	if (this->csgRoot) {
+		this->normalizedRoot = normalizer.normalize(this->csgRoot);
+		if (this->normalizedRoot) {
+			this->root_products.reset(new CSGProducts());
+			this->root_products->import(this->normalizedRoot);
+		}
+		else {
+			this->root_products.reset();
+			PRINT("WARNING: CSG normalization resulted in an empty tree");
+			if (procevents) QApplication::processEvents();
+		}
+	}
+
+	const std::vector<shared_ptr<CSGNode> > &highlight_terms = csgrenderer.getHighlightNodes();
+	if (highlight_terms.size() > 0) {
+		PRINTB("Compiling highlights (%d CSG Trees)...", highlight_terms.size());
+		if (procevents) QApplication::processEvents();
+
+		this->highlights_products.reset(new CSGProducts());
+		for (unsigned int i = 0; i < highlight_terms.size(); i++) {
+			shared_ptr<CSGNode> nterm = normalizer.normalize(highlight_terms[i]);
+			this->highlights_products->import(nterm);
+		}
+	}
+	else {
+		this->highlights_products.reset();
+	}
+
+	const std::vector<shared_ptr<CSGNode> > &background_terms = csgrenderer.getBackgroundNodes();
+	if (background_terms.size() > 0) {
+		PRINTB("Compiling background (%d CSG Trees)...", background_terms.size());
+		if (procevents) QApplication::processEvents();
+
+		this->background_products.reset(new CSGProducts());
+		for (unsigned int i = 0; i < background_terms.size(); i++) {
+			shared_ptr<CSGNode> nterm = normalizer.normalize(background_terms[i]);
+			this->background_products->import(nterm);
+		}
+	}
+	else {
+		this->background_products.reset();
+	}
+
+	if (this->root_products &&
+		(this->root_products->size() >
+			Preferences::inst()->getValue("advanced/openCSGLimit").toUInt())) {
+		PRINTB("WARNING: Normalized tree has %d elements!", this->root_products->size());
+		PRINT("WARNING: OpenCSG rendering has been disabled.");
+	}
+#ifdef ENABLE_OPENCSG
+	else {
+		PRINTB("Normalized CSG tree has %d elements",
+			(this->root_products ? this->root_products->size() : 0));
+		this->opencsgRenderer = new OpenCSGRenderer(this->root_products, this->highlights_products, this->background_products);
+	}
+#endif
+	this->thrownTogetherRenderer = new ThrownTogetherRenderer(this->root_products, this->highlights_products, this->background_products);
+	PRINT("Compile and preview finished.");
+	int s = this->renderingTime.elapsed() / 1000;
+	PRINTB("Total rendering time: %d hours, %d minutes, %d seconds", (s / (60 * 60)) % ((s / 60) % 60) % (s % 60));
+	if (procevents) QApplication::processEvents();
+}
+
 #ifdef ENABLE_CGAL
 
 void MainWindow::actionRender()
@@ -1958,62 +2031,92 @@ void MainWindow::cgalRender()
 	}
 
 	this->qglview->setRenderer(NULL);
-	delete this->cgalRenderer;
-	this->cgalRenderer = NULL;
+	if (this->cgalRenderer)
+		delete this->cgalRenderer;
+	this->cgalRenderer = new CGALRenderer(nullptr);
 	this->root_geom.reset();
+	viewModeSurface();
 
 	PRINT("Rendering Polygon Mesh using CGAL...");
 
 	this->progresswidget = new ProgressWidget(this);
 	connect(this->progresswidget, SIGNAL(requestShow()), this, SLOT(showProgress()));
 
-	progress_report_prep(this->root_node, report_func, this);
+	this->progresswidget->setValue(0);
 
-	this->cgalworker->start(this->tree);
+	this->cgalworker->start(this->tree, this->progress);
+}
+
+void printCGALPolyhedron(const CGAL_Nef_polyhedron *N) {
+	assert(N->getDimension() == 3);
+	const CGAL_Nef_polyhedron3 *p3 = N->get();
+	bool simple = p3->is_simple();
+	PRINTB("   Simple:     %6s", (simple ? "yes" : "no"));
+	PRINTB("   Vertices:   %6d", p3->number_of_vertices());
+	PRINTB("   Halfedges:  %6d", p3->number_of_halfedges());
+	PRINTB("   Edges:      %6d", p3->number_of_edges());
+	PRINTB("   Halffacets: %6d", p3->number_of_halffacets());
+	PRINTB("   Facets:     %6d", p3->number_of_facets());
+	PRINTB("   Volumes:    %6d", p3->number_of_volumes());
+	if (!simple) {
+		PRINT("WARNING: Object may not be a valid 2-manifold and may need repair!");
+	}
+}
+
+void printPolySet(const PolySet *ps) {
+	assert(ps->getDimension() == 3);
+	PRINTB("   Facets:     %6d", ps->numPolygons());
+}
+
+void printPolygon2d(const Polygon2d *poly) {
+	assert(poly->getDimension() == 2);
+	PRINTB("   Contours:     %6d", poly->outlines().size());
+}
+
+void printGeometry(const Geometry *geom, unsigned int depth = 0) {
+	std::string depthStr(depth == 0 ? "Top level" : "  Child");
+	if (const CGAL_Nef_polyhedron *N = dynamic_cast<const CGAL_Nef_polyhedron *>(geom)) {
+		PRINTB(" %s object is a 3D CGAL polyhedron:", depthStr);
+		printCGALPolyhedron(N);
+	}
+	else if (const GeometryGroup *G = dynamic_cast<const GeometryGroup *>(geom)) {
+		PRINTB(" %s object is a group of %d objects:", depthStr % G->getChildren().size());
+		for (const auto &child : G->getChildren())
+			printGeometry(child.second.get(), depth + 1);
+	}
+	else if (const PolySet *ps = dynamic_cast<const PolySet *>(geom)) {
+		PRINTB(" %s object is a %dD polyset:", depthStr % ps->getDimension());
+		printPolySet(ps);
+	}
+	else if (const Polygon2d *poly = dynamic_cast<const Polygon2d *>(geom)) {
+		PRINTB(" %s object is a 2D polygon:", depthStr);
+		printPolygon2d(poly);
+	}
+	else {
+		//assert(false && "Unknown geometry type");
+		PRINTB(" %s object is null", depthStr);
+	}
 }
 
 void MainWindow::actionRenderDone(shared_ptr<const Geometry> root_geom)
 {
-	progress_report_fin();
+	progressTicker.stop();
+
+	this->qglview->setRenderer(NULL);
+	delete this->cgalRenderer;
+	this->cgalRenderer = nullptr;
 
 	if (root_geom) {
 		GeometryCache::instance()->print();
 #ifdef ENABLE_CGAL
 		CGALCache::instance()->print();
 #endif
-
-		int s = this->renderingTime.elapsed() / 1000;
-		PRINTB("Total rendering time: %d hours, %d minutes, %d seconds", (s / (60*60)) % ((s / 60) % 60) % (s % 60));
 			
-		if (root_geom && !root_geom->isEmpty()) {
-			if (const CGAL_Nef_polyhedron *N = dynamic_cast<const CGAL_Nef_polyhedron *>(root_geom.get())) {
-				if (N->getDimension() == 3) {
-					bool simple = N->p3->is_simple();
-					PRINT("   Top level object is a 3D object:");
-					PRINTB("   Simple:     %6s", (simple ? "yes" : "no"));
-					PRINTB("   Vertices:   %6d", N->p3->number_of_vertices());
-					PRINTB("   Halfedges:  %6d", N->p3->number_of_halfedges());
-					PRINTB("   Edges:      %6d", N->p3->number_of_edges());
-					PRINTB("   Halffacets: %6d", N->p3->number_of_halffacets());
-					PRINTB("   Facets:     %6d", N->p3->number_of_facets());
-					PRINTB("   Volumes:    %6d", N->p3->number_of_volumes());
-					if (!simple) {
-						PRINT("WARNING: Object may not be a valid 2-manifold and may need repair!");
-					}
-				}
-			}
-			else if (const PolySet *ps = dynamic_cast<const PolySet *>(root_geom.get())) {
-				assert(ps->getDimension() == 3);
-				PRINT("   Top level object is a 3D object:");
-				PRINTB("   Facets:     %6d", ps->numPolygons());
-			} else if (const Polygon2d *poly = dynamic_cast<const Polygon2d *>(root_geom.get())) {
-				PRINT("   Top level object is a 2D object:");
-				PRINTB("   Contours:     %6d", poly->outlines().size());
-			} else {
-				assert(false && "Unknown geometry type");
-			}
-		}
+		if (root_geom && !root_geom->isEmpty())
+			printGeometry(root_geom.get());
 		PRINT("Rendering finished.");
+		int s = this->renderingTime.elapsed() / 1000;
+		PRINTB("Total rendering time: %d hours, %d minutes, %d seconds", (s / (60 * 60)) % ((s / 60) % 60) % (s % 60));
 
 		this->root_geom = root_geom;
 		this->cgalRenderer = new CGALRenderer(root_geom);
@@ -2142,12 +2245,15 @@ void MainWindow::actionCheckValidity() {
 	}
 
 	bool valid = false;
-	shared_ptr<const CGAL_Nef_polyhedron> N;
-	if (const PolySet *ps = dynamic_cast<const PolySet *>(this->root_geom.get())) {
-		N.reset(CGALUtils::createNefPolyhedronFromGeometry(*ps));
+	shared_ptr<const CGAL_Nef_polyhedron> N = dynamic_pointer_cast<const CGAL_Nef_polyhedron>(this->root_geom);
+	if (!N) {
+		if (const PolySet *ps = dynamic_cast<const PolySet *>(this->root_geom.get())) {
+			N.reset(CGALUtils::createNefPolyhedronFromGeometry(*ps));
+		}
 	}
-	if (N || (N = dynamic_pointer_cast<const CGAL_Nef_polyhedron>(this->root_geom))) {
-            valid = N->p3 ? N->p3->is_valid() : false;
+	if (N) {
+		if (CGAL_Nef_polyhedron3 *p3 = N.get()->get())
+			valid = p3 ? p3->is_valid() : false;
 	}
 	PRINTB("   Valid:      %6s", (valid ? "yes" : "no"));
 	clearCurrentOutput();
@@ -2196,7 +2302,7 @@ void MainWindow::actionExport(FileFormat format, const char *type_name, const ch
 	}
 
 	const CGAL_Nef_polyhedron *N = dynamic_cast<const CGAL_Nef_polyhedron *>(this->root_geom.get());
-	if (N && !N->p3->is_simple()) {
+	if (N && !(*N)->is_simple()) {
 	 	PRINT("WARNING: Object may not be a valid 2-manifold and may need repair! See http://en.wikibooks.org/wiki/OpenSCAD_User_Manual/STL_Import_and_Export");
 	}
 
@@ -2450,49 +2556,49 @@ void MainWindow::animateUpdate()
 
 void MainWindow::viewAngleTop()
 {
-	qglview->cam.object_rot << 90,0,0;
+	qglview->cam.object_rot << 90, 0, 0;
 	this->qglview->updateGL();
 }
 
 void MainWindow::viewAngleBottom()
 {
-	qglview->cam.object_rot << 270,0,0;
+	qglview->cam.object_rot << 270, 0, 0;
 	this->qglview->updateGL();
 }
 
 void MainWindow::viewAngleLeft()
 {
-	qglview->cam.object_rot << 0,0,90;
+	qglview->cam.object_rot << 0, 0, 90;
 	this->qglview->updateGL();
 }
 
 void MainWindow::viewAngleRight()
 {
-	qglview->cam.object_rot << 0,0,270;
+	qglview->cam.object_rot << 0, 0, 270;
 	this->qglview->updateGL();
 }
 
 void MainWindow::viewAngleFront()
 {
-	qglview->cam.object_rot << 0,0,0;
+	qglview->cam.object_rot << 0, 0, 0;
 	this->qglview->updateGL();
 }
 
 void MainWindow::viewAngleBack()
 {
-	qglview->cam.object_rot << 0,0,180;
+	qglview->cam.object_rot << 0, 0, 180;
 	this->qglview->updateGL();
 }
 
 void MainWindow::viewAngleDiagonal()
 {
-	qglview->cam.object_rot << 35,0,-25;
+	qglview->cam.object_rot << 35, 0, -25;
 	this->qglview->updateGL();
 }
 
 void MainWindow::viewCenter()
 {
-	qglview->cam.object_trans << 0,0,0;
+	qglview->cam.object_trans << 0, 0, 0;
 	this->qglview->updateGL();
 }
 
@@ -2538,6 +2644,11 @@ void MainWindow::on_consoleDock_visibilityChanged(bool)
 	consoleTopLevelChanged(consoleDock->isFloating());
 }
 
+void MainWindow::on_objectsDock_visibilityChanged(bool)
+{
+	objectsTopLevelChanged(objectsDock->isFloating());
+}
+
 void MainWindow::on_parameterDock_visibilityChanged(bool)
 {
     parameterTopLevelChanged(parameterDock->isFloating());
@@ -2551,6 +2662,11 @@ void MainWindow::editorTopLevelChanged(bool topLevel)
 void MainWindow::consoleTopLevelChanged(bool topLevel)
 {
 	setDockWidgetTitle(consoleDock, QString(_("Console")), topLevel);
+}
+
+void MainWindow::objectsTopLevelChanged(bool topLevel)
+{
+	setDockWidgetTitle(objectsDock, QString(_("Objects")), topLevel);
 }
 
 void MainWindow::parameterTopLevelChanged(bool topLevel)
@@ -2603,8 +2719,25 @@ void MainWindow::hideConsole()
 {
 	if (viewActionHideConsole->isChecked()) {
 		consoleDock->hide();
-	} else {
+	}
+	else {
 		consoleDock->show();
+	}
+}
+
+void MainWindow::showObjects()
+{
+	viewActionHideObjects->setChecked(false);
+	objectsDock->show();
+}
+
+void MainWindow::hideObjects()
+{
+	if (viewActionHideObjects->isChecked()) {
+		objectsDock->hide();
+	}
+	else {
+		objectsDock->show();
 	}
 }
 

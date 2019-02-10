@@ -57,6 +57,7 @@ Polygon2d *import_svg(const std::string &filename)
 		}
 		polygons.push_back(poly);
 	}
-	return ClipperUtils::apply(polygons, ClipperLib::ctUnion);
+	ClipperUtils utils;
+	return utils.apply(polygons, ClipperLib::ctUnion);
 }
 	

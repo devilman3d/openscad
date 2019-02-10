@@ -39,10 +39,18 @@ isEmpty(QT_VERSION) {
   }
 }
 
+debug {
+	DEFINES += DEBUG
+	VERSION = "0.0.0"
+}
+
+# force a consistent VERSION for dev builds so pch's work
+devbuild {
+	VERSION = "0.0.0"
+}
+
 # If VERSION is not set, populate VERSION, VERSION_YEAR, VERSION_MONTH from system date
 include(version.pri)
-
-debug: DEFINES += DEBUG
 
 TEMPLATE = app
 
@@ -95,6 +103,9 @@ mingw* {
   # as.exe: objects/cgalutils.o: too many sections (76541)
   # using -Wa,-mbig-obj did not help
   debug: QMAKE_CXXFLAGS += -O1
+  # prevent warnings from deprecated stuff
+  # todo: mostly fixed with newer version of Eigen...
+  QMAKE_CXXFLAGS += -Wno-deprecated-declarations
 }
 
 CONFIG += qt
@@ -126,10 +137,16 @@ netbsd* {
 
 # See Dec 2011 OpenSCAD mailing list, re: CGAL/GCC bugs.
 *g++* {
-  QMAKE_CXXFLAGS *= -fno-strict-aliasing
+  QMAKE_CXXFLAGS *= -fno-strict-aliasing -fno-diagnostics-show-caret -fno-diagnostics-show-option -fno-diagnostics-color
+  QMAKE_CXXFLAGS += -frounding-math
   QMAKE_CXXFLAGS_WARN_ON += -Wno-unused-local-typedefs # ignored before 4.8
   # debug: turn off optimization in debug builds
-  debug: QMAKE_LFLAGS += -rdynamic -O0
+  debug {
+	!mingw*: QMAKE_LFLAGS += -rdynamic -O0
+  }
+  devbuild {
+	!mingw*: QMAKE_LFLAGS += -rdynamic -O0
+  }
 }
 
 *clang* {
@@ -139,10 +156,44 @@ netbsd* {
   QMAKE_CXXFLAGS_WARN_ON += -Wno-unused-parameter
   QMAKE_CXXFLAGS_WARN_ON += -Wno-unused-variable
   QMAKE_CXXFLAGS_WARN_ON += -Wno-unused-function
+  QMAKE_CXXFLAGS_WARN_ON += -Wno-braced-scalar-init
   # gettext
   QMAKE_CXXFLAGS_WARN_ON += -Wno-format-security
   # might want to actually turn this on once in a while
   QMAKE_CXXFLAGS_WARN_ON += -Wno-sign-compare
+  nonotes {
+	# disable notes, requires my custom version of clang
+	QMAKE_CXXFLAGS_WARN_ON += -Wno-clang-notes
+  }
+  # -frounding math doesn't exist in clang; make CGAL stfu
+  DEFINES += CGAL_DISABLE_ROUNDING_MATH_CHECK
+  debug {
+    QMAKE_CXXFLAGS += -g -O0
+	QMAKE_LFLAGS += -rdynamic -O0
+  }
+  #QMAKE_LFLAGS += -fuse-ld=gold
+  #QMAKE_LFLAGS += -flto
+
+  # make sure -O0 is the only -O passed to compiler/linker in dev builds
+  devbuild {
+    QMAKE_CFLAGS_RELEASE -= -O
+    QMAKE_CFLAGS_RELEASE -= -O1
+    QMAKE_CFLAGS_RELEASE -= -O2
+    QMAKE_CFLAGS_RELEASE -= -O3
+    QMAKE_CFLAGS_RELEASE += -O0
+
+    QMAKE_CXXFLAGS_RELEASE -= -O
+    QMAKE_CXXFLAGS_RELEASE -= -O1
+    QMAKE_CXXFLAGS_RELEASE -= -O2
+    QMAKE_CXXFLAGS_RELEASE -= -O3
+    QMAKE_CXXFLAGS_RELEASE += -g -o0
+	
+    QMAKE_LFLAGS_RELEASE -= -O
+    QMAKE_LFLAGS_RELEASE -= -O1
+    QMAKE_LFLAGS_RELEASE -= -O2
+    QMAKE_LFLAGS_RELEASE -= -O3
+	QMAKE_LFLAGS += -rdynamic -O0
+  }
 }
 
 CONFIG(skip-version-check) {
@@ -176,6 +227,10 @@ experimental {
   DEFINES += ENABLE_EXPERIMENTAL
 }
 
+parameter_ui {
+  DEFINES += PARAMETER_UI
+}
+
 nogui {
   DEFINES += OPENSCAD_NOGUI
 }
@@ -184,11 +239,42 @@ mdi {
   DEFINES += ENABLE_MDI
 }
 
+# make the output less noisy
+quiet {
+	QUIETED_CC = $$QMAKE_CC
+	QMAKE_CC = "-@echo Compiling $$QUIETED_CC: $< =\> $@; "$${QUIETED_CC}
+	QUIETED_CXX = $$QMAKE_CXX
+	QMAKE_CXX = "-@echo Compiling $$QUIETED_CXX: $< =\> $@; "$${QUIETED_CXX}
+	QUIETED_LINK = $$QMAKE_LINK
+	QMAKE_LINK = "@echo Linking $$QUIETED_LINK: $@; "$${QUIETED_LINK}
+}
+
+# format errors, warnings, et.al. for Visual Studio
+msvc_errors {
+	QMAKE_CFLAGS += -fdiagnostics-format=msvc
+	QMAKE_CXXFLAGS += -fdiagnostics-format=msvc
+	QMAKE_LFLAGS += -fdiagnostics-format=msvc
+}
+
+# set the precompiled header file
+precompile_header {
+	PRECOMPILED_HEADER = src/StdAfx.hpp
+}
+
+# print CGAL profiling info on exit
+#DEFINES += CGAL_PROFILE
+
 include(common.pri)
 
 # mingw has to come after other items so OBJECT_DIRS will work properly
 CONFIG(mingw-cross-env)|CONFIG(mingw-cross-env-shared) {
   include(mingw-cross-env.pri)
+}
+
+# include stuff for the Parameters UI if desired
+parameter_ui {
+  DEFINES += PARAMETER_UI
+  include(src/parameter/parameters_ui.pri)
 }
 
 RESOURCES = openscad.qrc
@@ -205,14 +291,9 @@ FORMS   += src/MainWindow.ui \
            src/FontListDialog.ui \
            src/ProgressWidget.ui \
            src/launchingscreen.ui \
-           src/LibraryInfoDialog.ui \
-           src/parameter/ParameterWidget.ui \
-           src/parameter/ParameterEntryWidget.ui
+           src/LibraryInfoDialog.ui
 
 # AST nodes
-FLEXSOURCES += src/lexer.l 
-BISONSOURCES += src/parser.y
-
 HEADERS += src/AST.h \
            src/ModuleInstantiation.h \
            src/Package.h \
@@ -220,6 +301,7 @@ HEADERS += src/AST.h \
            src/expression.h \
            src/function.h \
            src/module.h \           
+           src/FactoryModule.h \           
            src/UserModule.h \
 
 SOURCES += src/AST.cc \
@@ -227,15 +309,13 @@ SOURCES += src/AST.cc \
            src/expr.cc \
            src/function.cc \
            src/module.cc \
+           src/FactoryModule.cc \           
            src/UserModule.cc \
            src/annotation.cc \
            src/assignment.cc
 
-# Comment parser
-FLEXSOURCES += src/comment_lexer.l
-BISONSOURCES += src/comment_parser.y
-
 HEADERS += src/version_check.h \
+           src/localscope.h \
            src/ProgressWidget.h \
            src/parsersettings.h \
            src/renderer.h \
@@ -277,6 +357,7 @@ HEADERS += src/version_check.h \
            src/localscope.h \
            src/feature.h \
            src/node.h \
+		   src/FactoryNode.h \
            src/csgnode.h \
            src/offsetnode.h \
            src/linearextrudenode.h \
@@ -297,6 +378,7 @@ HEADERS += src/version_check.h \
            src/GeometryUtils.h \
            src/polyset-utils.h \
            src/polyset.h \
+           src/PolyMesh.h \
            src/printutils.h \
            src/fileutils.h \
            src/value.h \
@@ -304,7 +386,13 @@ HEADERS += src/version_check.h \
            src/editor.h \
            src/NodeVisitor.h \
            src/ThreadedNodeVisitor.h \
+		   src/spinlock_pool_multi.h \
            src/CGAL_Handle_for_atomic_shared_ptr.h \
+           src/Profile_counterx.h \
+           src/Gmpfrx_type.h \
+           src/Gmpqx_type.h \
+           src/Gmpzx_type.h \
+           src/Gmpzfx_type.h \
            src/state.h \
            src/nodecache.h \
            src/nodedumper.h \
@@ -339,23 +427,11 @@ HEADERS += src/version_check.h \
            src/legacyeditor.h \
            src/LibraryInfoDialog.h \
            \
-           src/comment.h\
-           \
-           src/parameter/ParameterWidget.h \
-           src/parameter/parameterobject.h \
-           src/parameter/parameterextractor.h \
-           src/parameter/parametervirtualwidget.h \
-           src/parameter/parameterspinbox.h \
-           src/parameter/parametercombobox.h \
-           src/parameter/parameterslider.h \
-           src/parameter/parametercheckbox.h \
-           src/parameter/parametertext.h \
-           src/parameter/parametervector.h \
-           src/parameter/groupwidget.h \
-           src/parameter/parameterset.h\
+           src/comment.h \
            src/QWordSearchField.h
 
 SOURCES += \
+           src/GeometryEvaluator.cc \
            src/libsvg/libsvg.cc \
            src/libsvg/circle.cc \
            src/libsvg/ellipse.cc \
@@ -381,6 +457,7 @@ SOURCES += \
            src/localscope.cc \
            src/feature.cc \
            src/node.cc \
+		   src/FactoryNode.cc \
            src/context.cc \
            src/modcontext.cc \
            src/evalcontext.cc \
@@ -394,6 +471,7 @@ SOURCES += \
            src/GeometryUtils.cc \
            src/polyset.cc \
            src/polyset-gl.cc \
+           src/PolyMesh.cc \
            src/csgops.cc \
            src/transform.cc \
            src/color.cc \
@@ -421,7 +499,6 @@ SOURCES += \
            src/nodedumper.cc \
            src/NodeVisitor.cc \
            src/ThreadedNodeVisitor.cc \
-           src/GeometryEvaluator.cc \
            src/ModuleCache.cc \
            src/GeometryCache.cc \
            src/Tree.cc \
@@ -456,6 +533,7 @@ SOURCES += \
            src/export_png.cc \
            src/import.cc \
            src/import_stl.cc \
+           src/import_obj.cc \
            src/import_off.cc \
            src/import_svg.cc \
            src/import_amf.cc \
@@ -481,22 +559,8 @@ SOURCES += \
            src/legacyeditor.cc \
            src/LibraryInfoDialog.cc\
            \
-           src/comment.cpp \
-           \
-           src/parameter/ParameterWidget.cc\
-           src/parameter/parameterobject.cpp \
-           src/parameter/parameterextractor.cpp \
-           src/parameter/parameterspinbox.cpp \
-           src/parameter/parametercombobox.cpp \
-           src/parameter/parameterslider.cpp \
-           src/parameter/parametercheckbox.cpp \
-           src/parameter/parametertext.cpp \
-           src/parameter/parametervector.cpp \
-           src/parameter/groupwidget.cpp \
-           src/parameter/parameterset.cpp \
-           src/parameter/parametervirtualwidget.cpp\
+           src/comment.cpp\
            src/QWordSearchField.cc
-
 
 # ClipperLib
 SOURCES += src/polyclipping/clipper.cpp
@@ -579,6 +643,18 @@ win* {
   HEADERS += src/findversion.h
   SOURCES += src/PlatformUtils-win.cc
 }
+
+# lexer/parser setup
+include(flex.pri)
+include(bison.pri)
+
+# lexer/parser
+FLEXSOURCES += src/lexer.l 
+BISONSOURCES += src/parser.y
+
+# Comment parser
+FLEXSOURCES += src/comment_lexer.l
+BISONSOURCES += src/comment_parser.y
 
 isEmpty(PREFIX):PREFIX = /usr/local
 

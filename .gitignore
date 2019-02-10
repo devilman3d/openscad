@@ -1,4 +1,4 @@
-/*.scad
+**/*.scad
 **/out*.*
 *.dmg
 *~
@@ -11,10 +11,6 @@ objects
 .qmake.stash
 **/#*#
 /.dir-locals.el
-testdata/scad/2D/features/import_dxf-tests.scad
-testdata/scad/3D/features/import_stl-tests.scad
-testdata/scad/misc/include-tests.scad
-testdata/scad/misc/use-tests.scad
 **/project.xcworkspace
 **/xcuserdata
 /*.stl
@@ -50,3 +46,13 @@ src/*.org
 src/*.old
 src/*.debug
 /Testing
+/.vs
+/bin
+/obj
+/patches/tie-intercept.obj
+/openscad.natvis
+/Makefile.Release
+/Makefile.Debug
+/OpenscadGDB.vcxproj.user
+*.d
+/Eigen.natvis

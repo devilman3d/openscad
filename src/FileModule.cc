@@ -32,6 +32,7 @@
 #include "modcontext.h"
 #include "parsersettings.h"
 #include "StatCache.h"
+#include "ModuleInstantiation.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
@@ -63,8 +64,7 @@ void FileModule::registerUse(const std::string path) {
 	}
 }
 
-void FileModule::registerInclude(const std::string &localpath,
-																 const std::string &fullpath)
+void FileModule::registerInclude(const std::string &localpath, const std::string &fullpath)
 {
 	this->includes[localpath] = {fullpath};
 }
@@ -155,30 +155,48 @@ time_t FileModule::handleDependencies()
 	return latest;
 }
 
-AbstractNode *FileModule::instantiate(const Context *ctx, const ModuleInstantiation *inst,
-																			EvalContext *evalctx) const
+AbstractNode *FileModule::evaluate(Context &ctx) const
 {
-	assert(evalctx == nullptr);
-	
-	FileContext context(ctx);
-	return this->instantiateWithFileContext(&context, inst, evalctx);
-}
-
-AbstractNode *FileModule::instantiateWithFileContext(FileContext *ctx, const ModuleInstantiation *inst,
-																										 EvalContext *evalctx) const
-{
-	assert(evalctx == nullptr);
-	
-	AbstractNode *node = new RootNode(inst);
 	try {
-		ctx->initializeModule(*this); // May throw an ExperimentalFeatureException
-		// FIXME: Set document path to the path of the module
-		std::vector<AbstractNode *> instantiatednodes = this->scope.instantiateChildren(ctx);
-		node->children.insert(node->children.end(), instantiatednodes.begin(), instantiatednodes.end());
+		AbstractNode *node = RootNode::create();
+		this->scope.evaluate(ctx, node->getChildren());
+		return node;
 	}
 	catch (EvaluationException &e) {
 		PRINT(e.what());
 	}
+	return RootNode::create();
+}
 
-	return node;
+AbstractNode *FileModule::instantiate(const Context *ctx, const ModuleContext *evalctx) const
+{
+	assert(false && "Don't directly call FileModule::instantiate, use evaluate");
+
+	Context c(ctx);
+	return this->evaluate(c);
+}
+
+std::vector<Parameter> FileModule::getParameters() const
+{
+	std::vector<Parameter> result;
+
+	return result;
+}
+
+void Parameter::addAnnotations(AnnotationList *annotations)
+{
+	for (auto &annotation : *annotations) {
+		this->annotations.insert(std::make_pair(annotation.getName(), &annotation));
+	}
+}
+
+bool Parameter::hasAnnotations() const
+{
+	return !annotations.empty();
+}
+
+const Annotation *Parameter::annotation(const std::string &name) const
+{
+	auto found = annotations.find(name);
+	return found == annotations.end() ? nullptr : found->second;
 }

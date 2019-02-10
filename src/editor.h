@@ -3,7 +3,7 @@
 #include <QObject>
 #include <QString>
 #include <QWidget>
-#include <QWheelEvent>
+#include <QtGui/QWheelEvent>
 #include <QScrollBar>
 #include <QTextEdit>
 

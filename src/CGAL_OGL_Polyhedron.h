@@ -60,16 +60,13 @@ public:
 		PRINTD("CGAL_OGL_Polyhedron() end");
 	}
 
-	void draw(bool showedges) const {
+	void draw(bool showfaces, bool showedges) const {
 		PRINTD("draw()");
-		if(this->style == SNC_BOUNDARY) {
-			glCallList(this->object_list_+2);
-			if(showedges) {
-				glDisable(GL_LIGHTING);
-				glCallList(this->object_list_+1);
-				glCallList(this->object_list_);
-			}
-		} else {
+		if (showfaces) {
+			glEnable(GL_LIGHTING);
+			glCallList(this->object_list_ + 2);
+		}
+		if(showedges) {
 			glDisable(GL_LIGHTING);
 			glCallList(this->object_list_+1);
 			glCallList(this->object_list_);

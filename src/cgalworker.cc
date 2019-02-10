@@ -8,34 +8,34 @@
 
 CGALWorker::CGALWorker()
 {
-	this->thread = new QThread();
-	if (this->thread->stackSize() < 1024*1024) this->thread->setStackSize(1024*1024);
-	connect(this->thread, SIGNAL(started()), this, SLOT(work()));
-	moveToThread(this->thread);
+	connect(&thread, SIGNAL(started()), this, SLOT(work()));
+	if (thread.stackSize() < 1024*1024) 
+		thread.setStackSize(1024*1024);
+	moveToThread(&thread);
 }
 
 CGALWorker::~CGALWorker()
 {
-	delete this->thread;
 }
 
-void CGALWorker::start(const Tree &tree)
+void CGALWorker::start(const Tree &tree, Progress &progress)
 {
 	this->tree = &tree;
-	this->thread->start();
+	this->progress = &progress;
+	this->thread.start();
 }
 
 void CGALWorker::work()
 {
 	shared_ptr<const Geometry> root_geom;
 	try {
-		GeometryEvaluator evaluator(*this->tree, true);
-		root_geom = evaluator.evaluateGeometry(*this->tree->root(), true);
+		GeometryEvaluator geomevaluator(*this->tree, *this->progress, true, true);
+		root_geom = geomevaluator.evaluateGeometry(*this->tree->root());
 	}
 	catch (const ProgressCancelException &e) {
 		PRINT("Rendering cancelled.");
 	}
 
 	emit done(root_geom);
-	thread->quit();
+	thread.quit();
 }

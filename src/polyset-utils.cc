@@ -17,7 +17,7 @@ namespace PolysetUtils {
 	Polygon2d *project(const PolySet &ps) {
 		Polygon2d *poly = new Polygon2d;
 
-		for(const auto &p : ps.polygons) {
+		for(const auto &p : ps.getPolygons()) {
 			Outline2d outline;
 			for(const auto &v : p) {
 				outline.vertices.push_back(Vector2d(v[0], v[1]));
@@ -55,26 +55,42 @@ namespace PolysetUtils {
 		Reindexer<Vector3f> allVertices;
 		std::vector<std::vector<IndexedFace>> polygons;
 
-		for (const auto &pgon : inps.polygons) {
+		// polylines pass thru
+		std::vector<Polygon> polylines;
+
+		for (const auto &pgon : inps.getPolygons()) {
+			// don't tesselate polylines
+			if (pgon.open) {
+				polylines.push_back(pgon);
+				continue;
+			}
+			// count degenerates
 			if (pgon.size() < 3) {
 				degeneratePolygons++;
 				continue;
 			}
-			
+
 			polygons.push_back(std::vector<IndexedFace>());
 			std::vector<IndexedFace> &faces = polygons.back();
 			faces.push_back(IndexedFace());
 			IndexedFace &currface = faces.back();
-			for(const auto &v : pgon) {
+			for (const auto &v : pgon) {
 				// Create vertex indices and remove consecutive duplicate vertices
 				int idx = allVertices.lookup(v.cast<float>());
-				if (currface.empty() || idx != currface.back()) currface.push_back(idx);
+				if (currface.empty() || idx != currface.back()) 
+					currface.push_back(idx);
 			}
-			if (currface.front() == currface.back()) currface.pop_back();
-                    if (currface.size() < 3) {
-                        faces.pop_back(); // Cull empty triangles
-                        if (faces.empty()) polygons.pop_back(); // All faces were culled
-                    }
+			if (currface.front() == currface.back())
+				currface.pop_back();
+			if (currface.size() < 3) {
+				faces.pop_back(); // Cull empty triangles
+				if (faces.empty()) polygons.pop_back(); // All faces were culled
+			}
+		}
+
+		// don't double the polygons if updating in-place
+		if (&inps == &outps) {
+			outps = PolySet(inps.getDimension(), inps.convexValue());
 		}
 
 		// Tessellate indexed mesh
@@ -98,6 +114,11 @@ namespace PolysetUtils {
 				}
 			}
 		}
+
+		// append any polylines
+		for (auto pl : polylines)
+			outps.append_poly(pl);
+
 		if (degeneratePolygons > 0) PRINT("WARNING: PolySet has degenerate polygons");
 	}
 

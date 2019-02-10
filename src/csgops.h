@@ -2,13 +2,14 @@
 
 #include "node.h"
 #include "enums.h"
+#include "FactoryNode.h"
 
-class CsgOpNode : public AbstractNode
+class CsgOpNode : public FactoryNode
 {
 public:
 	VISITABLE();
+
+	CsgOpNode(OpenSCADOperator type) : type(type) { }
+
 	OpenSCADOperator type;
-	CsgOpNode(const ModuleInstantiation *mi, OpenSCADOperator type) : AbstractNode(mi), type(type) { }
-	virtual std::string toString() const;
-	virtual std::string name() const;
 };

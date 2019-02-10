@@ -14,7 +14,7 @@ void ParameterExtractor::applyParameters(FileModule *fileModule)
 {
   if (!fileModule) return;
 
-  for (auto &assignment : fileModule->scope.assignments) {
+  for (auto &assignment : fileModule->getParameters()) {
     auto entry = entries.find(assignment.name);
     if (entry != entries.end()) {
       entry->second->applyParameter(assignment);
@@ -30,7 +30,7 @@ void ParameterExtractor::setParameters(const FileModule* module)
   ModuleContext ctx;
 
   ParameterPos.clear();
-  for (auto &assignment : module->scope.assignments) {
+  for (auto &assignment : module->getParameters()) {
     const Annotation *param = assignment.annotation("Parameter");
     if (!param) continue;
 

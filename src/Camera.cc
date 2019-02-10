@@ -7,35 +7,36 @@ Camera::Camera(enum CameraType camtype) :
 {
 	PRINTD("Camera()");
 
-        // gimbal cam values
-        object_trans << 0,0,0;
-        object_rot << 35,0,25;
-        viewer_distance = 500;
+	// gimbal cam values
+	object_trans << 0, 0, 0;
+	object_rot << 35, 0, 25;
+	viewer_distance = 500;
 
-        // vector cam values
-        center << 0,0,0;
-        Eigen::Vector3d cameradir(1, 1, -0.5);
-        eye = center - 500 * cameradir;
+	// vector cam values
+	center << 0, 0, 0;
+	Eigen::Vector3d cameradir(1, 1, -0.5);
+	eye = center - 500 * cameradir;
 
 	pixel_width = RenderSettings::inst()->img_width;
 	pixel_height = RenderSettings::inst()->img_height;
 	autocenter = false;
 }
 
-void Camera::setup(std::vector<double> params)
+void Camera::setup(const GimbalCam &params)
 {
-	if (params.size() == 7) {
-		type = Camera::GIMBAL;
-		object_trans << params[0], params[1], params[2];
-		object_rot << params[3], params[4], params[5];
-		viewer_distance = params[6];
-	} else if (params.size() == 6) {
-		type = Camera::VECTOR;
-		eye << params[0], params[1], params[2];
-		center << params[3], params[4], params[5];
-	} else {
-		assert("Gimbal cam needs 7 numbers, Vector camera needs 6");
-	}
+	type = Camera::GIMBAL;
+	object_trans = params.object_trans;
+	object_rot = params.object_rot;
+	viewer_distance = params.viewer_distance;
+}
+
+void Camera::setup(const VectorCam &params)
+{
+	type = Camera::VECTOR;
+	eye = params.eye;
+	center = params.center;
+
+	// todo: recompute as gimbal type
 }
 
 void Camera::gimbalDefaultTranslate()
@@ -56,40 +57,40 @@ void Camera::viewAll(const BoundingBox &bbox)
 	if (this->type == Camera::NONE) {
 		this->type = Camera::VECTOR;
 		this->center = bbox.center();
-		this->eye = this->center - Vector3d(1,1,-0.5);
+		this->eye = this->center - Vector3d(1, 1, -0.5);
 	}
 
 	if (this->autocenter) {
 		// autocenter = point camera at the center of the bounding box.
-        if (this->type == Camera::GIMBAL) {
-            this->object_trans = -bbox.center(); // for Gimbal cam
-        }
-        else if (this->type == Camera::VECTOR) {
-            Vector3d dir = this->center - this->eye;
-            this->center = bbox.center(); // for Vector cam
-            this->eye = this->center - dir;
-        }
+		if (this->type == Camera::GIMBAL) {
+			this->object_trans = -bbox.center(); // for Gimbal cam
+		}
+		else if (this->type == Camera::VECTOR) {
+			Vector3d dir = this->center - this->eye;
+			this->center = bbox.center(); // for Vector cam
+			this->eye = this->center - dir;
+		}
 	}
 
-	double bboxRadius = bbox.diagonal().norm()/2;
-	double radius = (bbox.center()-this->center).norm() + bboxRadius;
-	double distance = radius / sin(this->fov/2*M_PI/180);
+	double bboxRadius = bbox.diagonal().norm() / 2;
+	double radius = (bbox.center() - this->center).norm() + bboxRadius;
+	double distance = radius / sin(this->fov / 2 * M_PI / 180);
 	switch (this->type) {
 	case Camera::GIMBAL:
 		this->viewer_distance = distance;
 		break;
 	case Camera::VECTOR: {
 		Vector3d cameradir = (this->center - this->eye).normalized();
-		this->eye = this->center - distance*cameradir;
+		this->eye = this->center - distance * cameradir;
 		break;
 	}
 	default:
 		assert(false && "Camera type not specified");
 	}
-	PRINTDB("modified center x y z %f %f %f",center.x() % center.y() % center.z());
-	PRINTDB("modified eye    x y z %f %f %f",eye.x() % eye.y() % eye.z());
-	PRINTDB("modified obj trans x y z %f %f %f",object_trans.x() % object_trans.y() % object_trans.z());
-	PRINTDB("modified obj rot   x y z %f %f %f",object_rot.x() % object_rot.y() % object_rot.z());
+	PRINTDB("modified center x y z %f %f %f", center.x() % center.y() % center.z());
+	PRINTDB("modified eye    x y z %f %f %f", eye.x() % eye.y() % eye.z());
+	PRINTDB("modified obj trans x y z %f %f %f", object_trans.x() % object_trans.y() % object_trans.z());
+	PRINTDB("modified obj rot   x y z %f %f %f", object_rot.x() % object_rot.y() % object_rot.z());
 }
 
 void Camera::zoom(int delta)

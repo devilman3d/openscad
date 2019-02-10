@@ -27,8 +27,6 @@ macx:isEmpty(OPENSCAD_LIBDIR) {
 
 
 include(win.pri)
-include(flex.pri)
-include(bison.pri)
 include(cgal.pri)
 include(opencsg.pri)
 include(opengl.pri)

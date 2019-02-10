@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nodecache.h"
+#include <unordered_map>
 
 /*!  
 	For now, just an abstraction of the node tree which keeps a dump
@@ -19,9 +20,11 @@ public:
 
 	const std::string &getString(const AbstractNode &node) const;
 	const std::string &getIdString(const AbstractNode &node) const;
+	const AbstractNode &getNode(const std::string &id) const;
 
 private:
 	const AbstractNode *root_node;
   mutable NodeCache nodecache;
   mutable NodeCache nodeidcache;
+  mutable std::unordered_map<std::string, const AbstractNode *> idnodecache;
 };

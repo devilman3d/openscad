@@ -259,20 +259,14 @@ PolySet * AmfImporter::read(const std::string filename)
 #ifdef ENABLE_CGAL
 	if (polySets.size() == 1) {
 		p = polySets[0];
-	} if (polySets.size() > 1) {
-		Geometry::Geometries children;
+	} 
+	if (polySets.size() > 1) {
+		GeometryHandles children;
 		for (std::vector<PolySet *>::iterator it = polySets.begin();it != polySets.end();it++) {
-			children.push_back(std::make_pair((const AbstractNode*)NULL,  shared_ptr<const Geometry>(*it)));
+			children.push_back(shared_ptr<const Geometry>(*it));
 		}
-		CGAL_Nef_polyhedron *N = CGALUtils::applyOperator(children, OPENSCAD_UNION);
-		PolySet *result = new PolySet(3);
-		if (CGALUtils::createPolySetFromNefPolyhedron3(*N->p3, *result)) {
-			delete result;
-			p = new PolySet(3);
-			PRINTB("ERROR: Error importing multi-object AMF file '%s'", filename);
-		} else {
-			p = result;
-		}
+		if (auto N = CGALUtils::applyOperator(children, OPENSCAD_UNION))
+			p = CGALUtils::createPolySetFromNefPolyhedron(*NefHandle(N));
 	}
 #endif
 	if (!p) {

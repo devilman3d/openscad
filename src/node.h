@@ -1,15 +1,16 @@
 #pragma once
 
 #include <vector>
+#include <list>
+#include <map>
 #include <string>
+#include <algorithm>
+#include <atomic>
+#include "memory.h"
 #include "BaseVisitable.h"
-
-extern int progress_report_count;
-extern void (*progress_report_f)(const class AbstractNode*, void*, int);
-extern void *progress_report_vp;
-
-void progress_report_prep(class AbstractNode *root, void (*f)(const class AbstractNode *node, void *vp, int mark), void *vp);
-void progress_report_fin();
+#include "AST.h"
+#include "maybe_const.h"
+#include "Handles.h"
 
 /*!  
 
@@ -27,50 +28,71 @@ class AbstractNode : public BaseVisitable
 	static size_t idx_counter;   // Node instantiation index
 public:
 	VISITABLE();
-	AbstractNode(const class ModuleInstantiation *mi);
+
+	AbstractNode();
 	virtual ~AbstractNode();
 	virtual std::string toString() const;
 	/*! The 'OpenSCAD name' of this node, defaults to classname, but can be 
 	    overloaded to provide specialization for e.g. CSG nodes, primitive nodes etc.
 	    Used for human-readable output. */
-	virtual std::string name() const = 0;
+	virtual std::string name() const final { return nodeName; }
 
-	const std::vector<AbstractNode*> &getChildren() const { 
-		return this->children;
-	}
+	NodeHandles &getChildren() { return this->children; }
+	const NodeHandles &getChildren() const { return this->children; }
 	size_t index() const { return this->idx; }
 
-	static void resetIndexCounter() { idx_counter = 1; }
+	size_t indexOfChild(const AbstractNode *child) const;
 
-	// FIXME: Make protected
-	std::vector<AbstractNode*> children;
-	const ModuleInstantiation *modinst;
+	static void resetIndexCounter() { idx_counter = 0; }
 
-	// progress_mark is a running number used for progress indication
-	// FIXME: Make all progress handling external, put it in the traverser class?
-	int progress_mark;
-	void progress_prepare();
-	void progress_report() const;
+	bool isBackground() const { return (this->nodeFlags & NodeFlags::Background) != 0; }
+	bool isHighlight() const { return (this->nodeFlags & NodeFlags::Highlight) != 0; }
+	bool isRoot() const { return (this->nodeFlags & NodeFlags::Root) != 0; }
 
+	virtual void addChild(const class Context &c, const NodeHandle &child)
+	{
+		//child->parent = this;
+		children.push_back(child);
+	}
+
+	virtual void addChildren(const class Context &c, const NodeHandles &children)
+	{
+		for (auto &child : children)
+			addChild(c, child);
+	}
+
+	//AbstractNode *parent;
+	NodeFlags nodeFlags;
 	int idx; // Node index (unique per tree)
+	std::string nodeName;
+
+	template <typename NodeType, typename ... Args>
+	static NodeType *create(const std::string &name, NodeFlags flags, Args ... args)
+	{
+		NodeType *result = new NodeType(args...);
+		result->nodeFlags = flags;
+		result->nodeName = name;
+		return result;
+	}
+protected:
+	NodeHandles children;
 };
 
 class AbstractIntersectionNode : public AbstractNode
 {
 public:
 	VISITABLE();
-	AbstractIntersectionNode(const ModuleInstantiation *mi) : AbstractNode(mi) { };
-	virtual ~AbstractIntersectionNode() { };
-	virtual std::string toString() const;
-	virtual std::string name() const;
+
+	static AbstractIntersectionNode *create(NodeFlags flags = NodeFlags::None)
+	{ 
+		return AbstractNode::create<AbstractIntersectionNode>("intersection", flags); 
+	}
 };
 
 class AbstractPolyNode : public AbstractNode
 {
 public:
 	VISITABLE();
-	AbstractPolyNode(const ModuleInstantiation *mi) : AbstractNode(mi) { };
-	virtual ~AbstractPolyNode() { };
 
 	enum render_mode_e {
 		RENDER_CGAL,
@@ -82,36 +104,52 @@ public:
   Logically groups objects together. Used as a way of passing
 	objects around without having to perform unions on them.
  */
-class GroupNode : public AbstractNode
+class GroupNode final : public AbstractNode
 {
 public:
 	VISITABLE();
-	GroupNode(const class ModuleInstantiation *mi) : AbstractNode(mi) { }
-	virtual ~GroupNode() { }
-	virtual std::string name() const;
+
+	static GroupNode *create(NodeFlags flags = NodeFlags::None)
+	{ 
+		return AbstractNode::create<GroupNode>("group", flags); 
+	}
 };
 
 /*!
 	Only instantiated once, for the top-level file.
 */
-class RootNode : public GroupNode
+class RootNode final : public AbstractNode
 {
 public:
 	VISITABLE();
 
-	RootNode(const class ModuleInstantiation *mi) : GroupNode(mi) { }
-	virtual ~RootNode() { }
-	virtual std::string name() const;
+	static RootNode *create(NodeFlags flags = NodeFlags::None)
+	{
+		return AbstractNode::create<RootNode>("root", flags);
+	}
 };
 
+/*
+	Base class for nodes which consume [child] geometries to create new geometry.
+*/
+class BranchNode : public AbstractPolyNode
+{
+public:
+	VISITABLE();
+
+	virtual ResultObject createGeometry(const NodeGeometries &children) const = 0;
+};
+
+/*
+	Base class for nodes which consume arguments to create geometry.
+*/
 class LeafNode : public AbstractPolyNode
 {
 public:
 	VISITABLE();
-	LeafNode(const ModuleInstantiation *mi) : AbstractPolyNode(mi) { };
-	virtual ~LeafNode() { };
-	virtual const class Geometry *createGeometry() const = 0;
+
+	virtual ResultObject createGeometry() const = 0;
 };
 
 std::ostream &operator<<(std::ostream &stream, const AbstractNode &node);
-AbstractNode *find_root_tag(AbstractNode *n);
+const AbstractNode *find_root_tag(const AbstractNode *n);

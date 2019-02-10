@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <string>
+#include <regex>
 #include <algorithm>
 #include <QString>
 #include <QChar>
@@ -446,6 +448,19 @@ void ScintillaEditor::setHighlightScheme(const QString &name)
 	noColor();
 }
 
+std::string stripTrailingWhitespace(const std::string &text)
+{
+	std::string exp = "[ \\t]+\\n";
+	std::string result = std::regex_replace(text, std::regex(exp), "\n");
+	return result;
+}
+
+QString stripTrailingWhitespace(const QString &text)
+{
+	std::string result = stripTrailingWhitespace(text.toStdString());
+	return QString::fromStdString(result);
+}
+
 void ScintillaEditor::insert(const QString &text)
 {
 	qsci->insert(text);
@@ -469,17 +484,87 @@ void ScintillaEditor::redo()
 
 void ScintillaEditor::cut()
 {
-	qsci->cut();
+	if (qsci->hasSelectedText())
+	{
+		QString text = qsci->selectedText();
+		QString stripped = stripTrailingWhitespace(text);
+		if (stripped != text) {
+			int savelineFrom, saveindexFrom, savelineTo, saveindexTo;
+			qsci->getSelection(&savelineFrom, &saveindexFrom, &savelineTo, &saveindexTo);
+			int savePositionFrom = qsci->positionFromLineIndex(savelineFrom, saveindexFrom);
+			int savePositionTo = qsci->positionFromLineIndex(savelineTo, saveindexTo);
+
+			qsci->replaceSelectedText(stripped);
+
+			int newPositionTo = savePositionTo - savePositionFrom + stripped.length();
+			int newLineTo, newIndexTo;
+			qsci->lineIndexFromPosition(newPositionTo, &newLineTo, &newIndexTo);
+			qsci->setSelection(savelineFrom, saveindexFrom, newLineTo, newIndexTo);
+		}
+		qsci->cut();
+	}
 }
 
 void ScintillaEditor::copy()
 {
-	qsci->copy();
+	if (qsci->hasSelectedText())
+	{
+		QString text = qsci->selectedText();
+		QString stripped = stripTrailingWhitespace(text);
+		if (stripped != text) {
+			// current
+			int savelineFrom, saveindexFrom, savelineTo, saveindexTo;
+			qsci->getSelection(&savelineFrom, &saveindexFrom, &savelineTo, &saveindexTo);
+			int savePositionFrom = qsci->positionFromLineIndex(savelineFrom, saveindexFrom);
+			int savePositionTo = qsci->positionFromLineIndex(savelineTo, saveindexTo);
+
+			// replace
+			qsci->replaceSelectedText(stripped);
+
+			// select replaced
+			int newPositionTo = savePositionTo - savePositionFrom + stripped.length();
+			int newLineTo, newIndexTo;
+			qsci->lineIndexFromPosition(newPositionTo, &newLineTo, &newIndexTo);
+			qsci->setSelection(savelineFrom, saveindexFrom, newLineTo, newIndexTo);
+
+		}
+		qsci->copy();
+	}
 }
 
 void ScintillaEditor::paste()
 {
+	// current
+	int savelineFrom, saveindexFrom, savelineTo, saveindexTo;
+	qsci->getSelection(&savelineFrom, &saveindexFrom, &savelineTo, &saveindexTo);
+	int savePositionFrom = qsci->positionFromLineIndex(savelineFrom, saveindexFrom);
+	int savePositionTo = qsci->positionFromLineIndex(savelineTo, saveindexTo);
+
+	// paste
 	qsci->paste();
+
+	// pasted
+	int pastedLineFrom, pastedIndexFrom;
+	qsci->getCursorPosition(&pastedLineFrom, &pastedIndexFrom);
+	int pastedPositionFrom = qsci->positionFromLineIndex(pastedLineFrom, pastedIndexFrom);
+
+	// select all and trim whitespace
+	qsci->selectAll();
+	QString text = qsci->selectedText();
+	QString stripped = stripTrailingWhitespace(text);
+	if (text != stripped) {
+		// replace
+		qsci->replaceSelectedText(stripped);
+
+		// scroll to top
+		qsci->setCursorPosition(1, 1);
+		// select at end of pasted line
+		qsci->setCursorPosition(pastedLineFrom + 1, -1);
+	}
+	else {
+		// undo select all
+		qsci->setCursorPosition(pastedLineFrom, pastedIndexFrom);
+	}
 }
 
 void ScintillaEditor::zoomIn()
@@ -573,23 +658,51 @@ void ScintillaEditor::replaceSelectedText(const QString &newText)
 
 void ScintillaEditor::replaceAll(const QString &findText, const QString &replaceText)
 {
+	// We need to issue a Select All first due to a bug in QScintilla:
+	// It doesn't update the find range when just doing findFirst() + findNext() causing the search
+	// to end prematurely if the replaced string is larger than the selected string.
+#if QSCINTILLA_VERSION >= 0x020903
+  // QScintilla bug seams to be fixed in 2.9.3
+	if (qsci->findFirst(findText,
+		false /*re*/, false /*cs*/, false /*wo*/,
+		false /*wrap*/, true /*forward*/, 0, 0)) {
+#elif QSCINTILLA_VERSION >= 0x020700
+	qsci->selectAll();
+	if (qsci->findFirstInSelection(findText,
+		false /*re*/, false /*cs*/, false /*wo*/,
+		false /*wrap*/, true /*forward*/)) {
+#else
+	// findFirstInSelection() was introduced in QScintilla 2.7
+	if (qsci->findFirst(findText,
+		false /*re*/, false /*cs*/, false /*wo*/,
+		false /*wrap*/, true /*forward*/, 0, 0)) {
+#endif
+		qsci->replace(replaceText);
+		while (qsci->findNext()) {
+			qsci->replace(replaceText);
+		}
+	}
+}
+
+void ScintillaEditor::replaceAllRegex(const QString &findText, const QString &replaceText)
+{
   // We need to issue a Select All first due to a bug in QScintilla:
   // It doesn't update the find range when just doing findFirst() + findNext() causing the search
   // to end prematurely if the replaced string is larger than the selected string.
 #if QSCINTILLA_VERSION >= 0x020903
   // QScintilla bug seams to be fixed in 2.9.3
   if (qsci->findFirst(findText,
-                      false /*re*/, false /*cs*/, false /*wo*/,
+                      true /*re*/, false /*cs*/, false /*wo*/,
                       false /*wrap*/, true /*forward*/, 0, 0)) {
 #elif QSCINTILLA_VERSION >= 0x020700
   qsci->selectAll();
   if (qsci->findFirstInSelection(findText, 
-                      false /*re*/, false /*cs*/, false /*wo*/, 
+                      true /*re*/, false /*cs*/, false /*wo*/, 
                       false /*wrap*/, true /*forward*/)) {
 #else
     // findFirstInSelection() was introduced in QScintilla 2.7
   if (qsci->findFirst(findText, 
-                      false /*re*/, false /*cs*/, false /*wo*/, 
+                      true /*re*/, false /*cs*/, false /*wo*/, 
                       false /*wrap*/, true /*forward*/, 0, 0)) {
 #endif
     qsci->replace(replaceText);
@@ -681,6 +794,21 @@ bool ScintillaEditor::eventFilter(QObject* obj, QEvent *e)
 		 || e->type()==QEvent::KeyRelease
 		 ) {
 		QKeyEvent *ke = static_cast<QKeyEvent*>(e);
+		if (ke->matches(QKeySequence::StandardKey::Copy)) {
+			if (e->type() == QEvent::KeyPress)
+				copy();
+			return true;
+		}
+		if (ke->matches(QKeySequence::StandardKey::Paste)) {
+			if (e->type() == QEvent::KeyPress)
+				paste();
+			return true;
+		}
+		if (ke->matches(QKeySequence::StandardKey::Cut)) {
+			if (e->type() == QEvent::KeyPress)
+				cut();
+			return true;
+		}
 		if ((ke->modifiers() & ~Qt::KeypadModifier) == Qt::AltModifier) {
 			switch (ke->key())
 			{

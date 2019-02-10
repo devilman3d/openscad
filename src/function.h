@@ -4,6 +4,7 @@
 #include "value.h"
 #include "Assignment.h"
 #include "feature.h"
+#include "localscope.h"
 
 #include <string>
 #include <vector>
@@ -36,19 +37,30 @@ public:
 	virtual std::string dump(const std::string &indent, const std::string &name) const;
 };
 
+class FactoryFunction : public BuiltinFunction
+{
+public:
+	FactoryFunction(const char *name, eval_func_t func);
+
+	std::string name;
+};
+
 class UserFunction : public AbstractFunction, public ASTNode
 {
 public:
 	std::string name;
 	AssignmentList definition_arguments;
 
+	LocalScope scope;
 	shared_ptr<Expression> expr;
 
+	UserFunction(const char *name, AssignmentList &definition_arguments, const Location &loc);
 	UserFunction(const char *name, AssignmentList &definition_arguments, shared_ptr<Expression> expr, const Location &loc);
 	virtual ~UserFunction();
 
 	virtual ValuePtr evaluate(const Context *ctx, const EvalContext *evalctx) const;
 	virtual std::string dump(const std::string &indent, const std::string &name) const;
-        
+
+	static UserFunction *create(const char *name, AssignmentList &definition_arguments, const Location &loc);
 	static UserFunction *create(const char *name, AssignmentList &definition_arguments, shared_ptr<Expression> expr, const Location &loc);
 };

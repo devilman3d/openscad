@@ -28,15 +28,14 @@
 #include "ModuleInstantiation.h"
 #include "node.h"
 #include "builtin.h"
-#include "evalcontext.h"
+#include "modcontext.h"
 
-AbstractNode *GroupModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const
+AbstractNode *GroupModule::instantiate(const Context *ctx, const ModuleContext *evalctx) const
 {
-	(void)ctx; // avoid unusued parameter warning
+	AbstractNode *node = GroupNode::create(evalctx->flags());
 
-	AbstractNode *node = new GroupNode(inst);
-
-	node->children = inst->instantiateChildren(evalctx);
+	Context c(ctx);
+	evalctx->evaluate(c, node->getChildren());
 
 	return node;
 }

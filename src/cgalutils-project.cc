@@ -187,10 +187,10 @@ namespace CGALUtils {
 
 		CGAL_Nef_polyhedron newN;
 		if (cut) {
-			CGALUtils::lockErrors(CGAL::THROW_EXCEPTION);
+			CGALUtils::ErrorLocker errorLocker;
 			try {
 				CGAL_Nef_polyhedron3::Plane_3 xy_plane = CGAL_Nef_polyhedron3::Plane_3(0,0,1,0);
-				newN.p3.reset(new CGAL_Nef_polyhedron3(N.p3->intersection(xy_plane, CGAL_Nef_polyhedron3::PLANE_ONLY)));
+				newN.reset(new CGAL_Nef_polyhedron3(N->intersection(xy_plane, CGAL_Nef_polyhedron3::PLANE_ONLY)));
 			}
 			catch (const CGAL::Failure_exception &e) {
 				PRINTDB("CGALUtils::project during plane intersection: %s", e.what());
@@ -207,15 +207,14 @@ namespace CGALUtils {
 					CGAL_Polyhedron bigbox;
 					CGAL::convex_hull_3(pts.begin(), pts.end(), bigbox);
 					CGAL_Nef_polyhedron3 nef_bigbox(bigbox);
-					newN.p3.reset(new CGAL_Nef_polyhedron3(nef_bigbox.intersection(*N.p3)));
+					newN.reset(new CGAL_Nef_polyhedron3(nef_bigbox.intersection(*N)));
 				}
 				catch (const CGAL::Failure_exception &e) {
 					PRINTB("ERROR: CGAL error in CGALUtils::project during bigbox intersection: %s", e.what());
 				}
 			}
 				
-			if (!newN.p3 || newN.p3->is_empty()) {
-				CGALUtils::unlockErrors();
+			if (!newN.get() || newN->is_empty()) {
 				PRINT("WARNING: projection() failed.");
 				return poly;
 			}
@@ -226,12 +225,12 @@ namespace CGALUtils {
 				CGAL_Nef_polyhedron3::Volume_const_iterator i;
 				CGAL_Nef_polyhedron3::Shell_entry_const_iterator j;
 				CGAL_Nef_polyhedron3::SFace_const_handle sface_handle;
-				for (i = newN.p3->volumes_begin(); i != newN.p3->volumes_end(); ++i) {
+				for (i = newN->volumes_begin(); i != newN->volumes_end(); ++i) {
 					PRINTDB("<!-- volume. mark: %s -->",i->mark());
 					for (j = i->shells_begin(); j != i->shells_end(); ++j) {
 						PRINTDB("<!-- shell. (vol mark was: %i)", i->mark());;
 						sface_handle = CGAL_Nef_polyhedron3::SFace_const_handle(j);
-						newN.p3->visit_shell_objects(sface_handle , zremover);
+						newN->visit_shell_objects(sface_handle , zremover);
 						PRINTD("<!-- shell. end. -->");
 					}
 					PRINTD("<!-- volume end. -->");
@@ -241,20 +240,34 @@ namespace CGALUtils {
 				PRINTB("ERROR: CGAL error in CGALUtils::project while flattening: %s", e.what());
 			}
 			PRINTD("</svg>");
-				
-			CGALUtils::unlockErrors();
 		}
 		// In projection mode all the triangles are projected manually into the XY plane
 		else {
-			PolySet ps(3);
-			bool err = CGALUtils::createPolySetFromNefPolyhedron3(*N.p3, ps);
-			if (err) {
-				PRINT("ERROR: Nef->PolySet failed");
-				return poly;
+			if (auto ps = CGALUtils::createPolySetFromNefPolyhedron(N)) {
+				poly = PolysetUtils::project(*PolySetHandle(ps));
 			}
-			poly = PolysetUtils::project(ps);
+			else {
+				PRINT("ERROR: Nef->PolySet failed");
+			}
 		}
 		return poly;
+	}
+
+	shared_ptr<CGAL_Nef_polyhedron3> split(const CGAL_Nef_polyhedron &N, const CGAL_Nef_polyhedron3::Plane_3 &plane)
+	{
+		shared_ptr<CGAL_Nef_polyhedron3> result;
+
+		if (N.getDimension() == 3) {
+			CGALUtils::ErrorLocker errorLocker;
+			try {
+				result.reset(new CGAL_Nef_polyhedron3(N->intersection(plane, CGAL_Nef_polyhedron3::CLOSED_HALFSPACE)));
+			}
+			catch (const CGAL::Failure_exception &e) {
+				PRINTB("ERROR: CGAL error in CGALUtils::split during intersection: %s", e.what());
+			}
+		}
+
+		return result;
 	}
 
 } // namespace

@@ -65,7 +65,7 @@ bool export_png_preview_common(Tree &tree, Camera &cam, std::ostream &output, Pr
 	}
 
 #ifdef ENABLE_OPENCSG
-	OpenCSGRenderer openCSGRenderer(csgInfo.root_products, csgInfo.highlights_products, csgInfo.background_products, glview->shaderinfo);
+	OpenCSGRenderer openCSGRenderer(csgInfo.root_products, csgInfo.highlights_products, csgInfo.background_products);
 #endif
 	ThrownTogetherRenderer thrownTogetherRenderer(csgInfo.root_products, csgInfo.highlights_products, csgInfo.background_products);
 

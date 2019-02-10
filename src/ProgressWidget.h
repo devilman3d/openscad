@@ -3,6 +3,7 @@
 #include "qtgettext.h"
 #include "ui_ProgressWidget.h"
 #include <QTime>
+#include <QProgressBar>
 
 class ProgressWidget : public QWidget, public Ui::ProgressWidget
 {
@@ -15,7 +16,9 @@ public:
 	int elapsedTime() const;
 
 public slots:
-	void setRange(int minimum, int maximum);
+	void setIdle(int cpuId);
+	void setCpuData(int cpuId, const std::string &description, int value, int maxValue);
+	void setRange(int maximum);
 	void setValue(int progress);
 	int value() const;
 	void cancel();
@@ -26,4 +29,6 @@ signals:
 private:
 	bool wascanceled;
 	QTime starttime;
+
+	std::vector<QProgressBar*> cpuBars;
 };

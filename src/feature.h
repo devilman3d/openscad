@@ -1,6 +1,5 @@
 #pragma once
 
-#include <stdio.h>
 #include <iostream>
 #include <string>
 #include <map>
@@ -23,6 +22,7 @@ public:
         static const Feature ExperimentalSvgImport;
         static const Feature ExperimentalCustomizer;
 	static const Feature ExperimentalThreadedTraversal;
+	static const Feature ExperimentalThreadedUnion;
 
 	const std::string& get_name() const;
 	const std::string& get_description() const;

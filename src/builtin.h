@@ -5,25 +5,42 @@
 #include "module.h"
 #include "localscope.h"
 
-class Builtins
+/*
+	A "static" scope to provide access to builtin modules,
+	functions and variables.
+*/
+class Builtins : public LocalScope
 {
 public:
-	typedef std::unordered_map<std::string, class AbstractFunction*> FunctionContainer;
-	typedef std::unordered_map<std::string, class AbstractModule*> ModuleContainer;
-
-	static Builtins *instance(bool erase = false);
+	// add a [C++] module to the global scope
 	static void init(const char *name, class AbstractModule *module);
+	// add a [C++] function to the global scope
 	static void init(const char *name, class AbstractFunction *function);
-	void initialize();
-	std::string isDeprecated(const std::string &name);
+	// add a [C++] variable to the global scope
+	static void init(const char *name, const class ValuePtr &value);
 
-	const LocalScope &getGlobalScope() { return this->globalscope; }
+	// determines if the named module or function will be removed in a future release
+	static std::string isDeprecated(const std::string &name);
 
+	// gets the static Builtins scope
+	static const LocalScope &getGlobalScope() { return *instance(); }
+
+	// gets a space-separated string of keywords for the lexer
+	//	index = 1: function names
+	//	index = 2: module names
+	static std::string getLexerKeywords(int index);
+
+	// deletes the static instance
+	static void release();
 private:
-	Builtins();
-	~Builtins();
+	// private constructor
+	Builtins() { }
 
-	LocalScope globalscope;
+	// get/release the static instance
+	static Builtins *instance(bool erase = false);
+
+	// separated initialize method called when the static instance is created
+	void initialize();
 
 	std::unordered_map<std::string, std::string> deprecations;
 };

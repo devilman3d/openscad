@@ -54,6 +54,7 @@ public:
     bool find(const QString &, bool findNext = false, bool findBackwards = false);
 	void replaceSelectedText(const QString&);
 	void replaceAll(const QString &findText, const QString &replaceText);
+	void replaceAllRegex(const QString &findText, const QString &replaceText);
 	QStringList colorSchemes();
     bool canUndo();
 

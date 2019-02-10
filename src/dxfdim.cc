@@ -58,8 +58,7 @@ ValuePtr builtin_dxf_dim(const Context *ctx, const EvalContext *evalctx)
 		ValuePtr n = evalctx->getArgName(i);
 		ValuePtr v = evalctx->getArgValue(i);
 		if (evalctx->getArgName(i) == "file") {
-			filename = lookup_file(v->toString(), 
-														 evalctx->documentPath(), ctx->documentPath());
+			filename = lookup_file(v->toString(), evalctx->documentPath(), ctx->documentPath());
 		}
 		if (n == "layer") layername = v->toString();
 		if (n == "origin") v->getVec2(xorigin, yorigin);

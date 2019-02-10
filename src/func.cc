@@ -30,6 +30,7 @@
 #include "function.h"
 #include "expression.h"
 #include "evalcontext.h"
+#include "modcontext.h"
 #include "builtin.h"
 #include "stl-utils.h"
 #include "printutils.h"
@@ -517,11 +518,23 @@ ValuePtr builtin_concat(const Context *, const EvalContext *evalctx)
 	return ValuePtr(result);
 }
 
-ValuePtr builtin_lookup(const Context *, const EvalContext *evalctx)
+ValuePtr builtin_lookup(const Context *ctx, const EvalContext *evalctx)
 {
+	// needs one argument
+	if (evalctx->numArgs() == 0)
+		return ValuePtr::undefined;
+
+	// single argument is a string = lookup a local with that name
+	if (evalctx->numArgs() == 1) {
+		ValuePtr v = evalctx->getArgValue(0);
+		if (v->isDefinedAs(Value::STRING))
+			return ctx->lookup_variable(v->toString(), true);
+		return ValuePtr::undefined;
+	}
+
+	// more than one argument
 	double p, low_p, low_v, high_p, high_v;
-	if (evalctx->numArgs() < 2 ||                     // Needs two args
-	    !evalctx->getArgValue(0)->getDouble(p)) // First must be a number
+	if (!evalctx->getArgValue(0)->getDouble(p)) // First must be a number
 		return ValuePtr::undefined;
 
 	ValuePtr v1 = evalctx->getArgValue(1);
@@ -783,7 +796,7 @@ ValuePtr builtin_parent_module(const Context *, const EvalContext *evalctx)
 {
 	int n;
 	double d;
-	int s = UserModule::stack_size();
+	int s = UserContext::stack_size();
 	if (evalctx->numArgs() == 0)
 		d=1; // parent module
 	else if (evalctx->numArgs() == 1) {
@@ -801,7 +814,7 @@ ValuePtr builtin_parent_module(const Context *, const EvalContext *evalctx)
 		PRINTB("WARNING: Parent module index (%d) greater than the number of modules on the stack", n);
 		return ValuePtr::undefined;
 	}
-	return ValuePtr(UserModule::stack_element(s - 1 - n));
+	return ValuePtr(UserContext::stack_element(s - 1 - n)->getUserModule()->name);
 }
 
 ValuePtr builtin_norm(const Context *, const EvalContext *evalctx)
@@ -878,6 +891,45 @@ ValuePtr builtin_cross(const Context *, const EvalContext *evalctx)
 	result.push_back(ValuePtr(z));
 	return ValuePtr(result);
 }
+
+ValuePtr builtin_identity(const Context *, const EvalContext *evalctx)
+{
+	return ValuePtr(Transform3d::Identity());
+}
+
+FactoryFunction BuiltinIdentity("identity", builtin_identity);
+
+ValuePtr builtin_inverse(const Context *, const EvalContext *evalctx)
+{
+	if (evalctx->numArgs() != 1) {
+		PRINT("WARNING: Invalid number of parameters for inverse()");
+		return ValuePtr::undefined;
+	}
+
+	ValuePtr arg0 = evalctx->getArgValue(0);
+	Transform3d m;
+	if (arg0->getTransform(m))
+		return ValuePtr(m.inverse());
+
+	PRINT("WARNING: Invalid parameter for inverse()");
+	return ValuePtr::undefined;
+}
+
+FactoryFunction BuiltinInverse("inverse", builtin_inverse);
+
+ValuePtr builtin_lerp(const Context *, const EvalContext *evalctx)
+{
+	if (evalctx->numArgs() == 3) {
+		ValuePtr a = evalctx->getArgValue(0);
+		ValuePtr b = evalctx->getArgValue(1);
+		ValuePtr t = evalctx->getArgValue(2);
+		// todo: make sure a & b are the same type (vector or number) and t is a number
+		return (b - a) * t + a;
+	}
+	return ValuePtr::undefined;
+}
+
+FactoryFunction BuiltinLerp("lerp", builtin_lerp);
 
 void register_builtin_functions()
 {

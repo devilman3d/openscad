@@ -39,17 +39,19 @@
 #include "ModuleInstantiation.h"
 #include "Assignment.h"
 #include "expression.h"
+#include "expressions.h"
 #include "value.h"
 #include "function.h"
 #include "printutils.h"
 #include "memory.h"
+#include "AST.h"
 #include <sstream>
 #include <boost/filesystem.hpp>
 
 namespace fs = boost::filesystem;
 
 #define YYMAXDEPTH 20000
-#define LOC(loc) Location(loc.first_line, loc.first_column, loc.last_line, loc.last_column)
+#define LOC(loc) Location(parser_sourcefile.parent_path().generic_string(), loc.first_line, loc.first_column, loc.last_line, loc.last_column)
   
 int parser_error_pos = -1;
 
@@ -62,6 +64,7 @@ int lexerlex_destroy(void);
 int lexerlex(void);
 
 std::stack<LocalScope *> scope_stack;
+size_t anonId = 0;
 FileModule *rootmodule;
 
 extern void lexerdestroy();
@@ -87,6 +90,7 @@ fs::path parser_sourcefile;
 %token TOK_ERROR
 
 %token TOK_MODULE
+%token TOK_STRUCT
 %token TOK_FUNCTION
 %token TOK_IF
 %token TOK_ELSE
@@ -128,10 +132,11 @@ fs::path parser_sourcefile;
 %left HIGH_PRIO_LEFT
 
 %type <expr> expr
+%type <expr> struct_expr
 %type <vec> vector_expr
-%type <expr> list_comprehension_elements
-%type <expr> list_comprehension_elements_p
-%type <expr> list_comprehension_elements_or_expr
+%type <expr> list
+%type <expr> list_p
+%type <expr> list_or_expr
 %type <expr> expr_or_empty
 
 %type <inst> module_instantiation
@@ -161,75 +166,126 @@ input:    /* empty */
         ;
 
 statement:
+        ';'
+    | '{' statements '}'
+    | module_instantiation
+        {
+            if ($1) scope_stack.top()->addChild($1);
+        }
+    | assignment
+	| module_definition
+    | function_definition
+    | struct_definition
+    ;
+
+statements:
+        /* empty */
+    | statement statements
+    ;
+
+struct_statement:
+        ';'
+    | assignment
+	| module_definition
+    | function_definition
+    | struct_definition
+    ;
+		
+struct_statements:
+        /* empty */
+    | struct_statement struct_statements
+	;
+
+struct_scope:
+		struct_statements
+    ;
+
+function_statement:
           ';'
-        | '{' inner_input '}'
-        | module_instantiation
-            {
-              if ($1) scope_stack.top()->addChild($1);
-            }
         | assignment
-        | TOK_MODULE TOK_ID '(' arguments_decl optional_commas ')'
-            {
-              UserModule *newmodule = new UserModule(LOC(@$));
-              newmodule->definition_arguments = *$4;
-              scope_stack.top()->addModule($2, newmodule);
-              scope_stack.push(&newmodule->scope);
-              free($2);
-              delete $4;
-            }
-          statement
-            {
-                scope_stack.pop();
-            }
-        | TOK_FUNCTION TOK_ID '(' arguments_decl optional_commas ')' '=' expr
-            {
-              UserFunction *func = UserFunction::create($2, *$4, shared_ptr<Expression>($8), LOC(@$));
-              scope_stack.top()->addFunction(func);
-              free($2);
-              delete $4;
-            }
-          ';'
         ;
 
-inner_input:
+function_scope:
           /* empty */
-        | statement inner_input
+        | function_scope function_statement
         ;
+
+module_definition:
+        TOK_MODULE TOK_ID '(' arguments_decl optional_commas ')'
+        {
+            UserModule *newmodule = new UserModule($2, *$4, LOC(@$));
+            scope_stack.top()->addModule(newmodule);
+            scope_stack.push(&newmodule->scope);
+            free($2);
+            delete $4;
+        }
+        statement
+        {
+            scope_stack.pop();
+        }
+	;
+
+struct_definition:
+        TOK_STRUCT TOK_ID
+        {
+            UserStruct *newstruct = new UserStruct($2, LOC(@$));
+            scope_stack.top()->addStruct(newstruct);
+            scope_stack.push(&newstruct->scope);
+            free($2);
+        }
+		'{' struct_scope '}'
+        {
+            scope_stack.pop();
+        }
+	;
+
+function_definition:
+        TOK_FUNCTION TOK_ID '(' arguments_decl optional_commas ')' '=' expr
+        {
+            UserFunction *func = UserFunction::create($2, *$4, std::shared_ptr<Expression>($8), LOC(@$));
+            scope_stack.top()->addFunction(func);
+            free($2);
+            delete $4;
+        }
+        ';'
+	|	TOK_FUNCTION TOK_ID '(' arguments_decl optional_commas ')'
+        {
+            UserFunction *func = UserFunction::create($2, *$4, LOC(@$));
+            scope_stack.top()->addFunction(func);
+            scope_stack.push(&func->scope);
+            free($2);
+            delete $4;
+        }
+		'{' function_scope "return" expr ';' '}'
+        {
+			scope_stack.top()->addResult($11);
+            scope_stack.pop();
+        }
+	;
 
 assignment:
-          TOK_ID '=' expr ';'
-            {
-                bool found = false;
-                for (auto &assignment : scope_stack.top()->assignments) {
-                    if (assignment.name == $1) {
-                        assignment.expr = shared_ptr<Expression>($3);
-                        assignment.setLocation(LOC(@$));
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                  scope_stack.top()->addAssignment(Assignment($1, shared_ptr<Expression>($3), LOC(@$)));
-                }
-                free($1);
-            }
-        ;
+        TOK_ID '=' expr ';'
+        {
+            scope_stack.top()->addAssignment(Assignment($1, std::shared_ptr<Expression>($3), LOC(@$)));
+            free($1);
+        }
+    ;
 
 module_instantiation:
           '!' module_instantiation
             {
                 $$ = $2;
-                if ($$) $$->tag_root = true;
+                if ($$) $$->setFlag(NodeFlags::Root);
             }
         | '#' module_instantiation
             {
                 $$ = $2;
-                if ($$) $$->tag_highlight = true;
+                if ($$) $$->setFlag(NodeFlags::Highlight);
             }
         | '%' module_instantiation
             {
                 $$ = $2;
-                if ($$) $$->tag_background = true;
+                if ($$) $$->setFlag(NodeFlags::Background);
             }
         | '*' module_instantiation
             {
@@ -271,7 +327,7 @@ ifelse_statement:
 if_statement:
           TOK_IF '(' expr ')'
             {
-                $<ifelse>$ = new IfElseModuleInstantiation(shared_ptr<Expression>($3), parser_sourcefile.parent_path().generic_string(), LOC(@$));
+                $<ifelse>$ = new IfElseModuleInstantiation($3, LOC(@$));
                 scope_stack.push(&$<ifelse>$->scope);
             }
           child_statement
@@ -309,9 +365,16 @@ module_id:
 single_module_instantiation:
           module_id '(' arguments_call ')'
             {
-                $$ = new ModuleInstantiation($1, *$3, parser_sourcefile.parent_path().generic_string(), LOC(@$));
+                $$ = new ModuleInstantiation($1, *$3, LOC(@$));
                 free($1);
                 delete $3;
+            }
+		| TOK_ID '.' module_id '(' arguments_call ')'
+            {
+                $$ = new ModuleInstantiation($1, $3, *$5, LOC(@$));
+                free($1);
+                free($3);
+                delete $5;
             }
         ;
 
@@ -328,20 +391,21 @@ expr:
             {
               $$ = new Literal(ValuePtr::undefined, LOC(@$));
             }
+        | TOK_STRING
+            {
+              $$ = new Literal(ValuePtr(std::string($1)), LOC(@$));
+              free($1);
+            }
         | TOK_ID
             {
               $$ = new Lookup($1, LOC(@$));
                 free($1);
             }
-        | expr '.' TOK_ID
+        | TOK_ID '.' TOK_ID
             {
               $$ = new MemberLookup($1, $3, LOC(@$));
-              free($3);
-            }
-        | TOK_STRING
-            {
-              $$ = new Literal(ValuePtr(std::string($1)), LOC(@$));
               free($1);
+              free($3);
             }
         | TOK_NUMBER
             {
@@ -439,11 +503,22 @@ expr:
             {
               $$ = new ArrayLookup($1, $3, LOC(@$));
             }
+		| struct_expr
+			{
+				$$ = $1;
+			}
         | TOK_ID '(' arguments_call ')'
             {
               $$ = new FunctionCall($1, *$3, LOC(@$));
               free($1);
               delete $3;
+            }
+        | TOK_ID '.' TOK_ID '(' arguments_call ')'
+            {
+              $$ = new MemberFunctionCall($1, $3, *$5, LOC(@$));
+              free($1);
+              free($3);
+              delete $5;
             }
         | TOK_LET '(' arguments_call ')' expr %prec LET
             {
@@ -461,6 +536,19 @@ expr:
               delete $3;
             }
         ;
+		
+struct_expr:
+        {
+			UserStruct *newstruct = new UserStruct(LOC(@$));
+			scope_stack.push(&newstruct->scope);
+			$<expr>$ = newstruct;
+        }
+		'{' struct_scope '}'
+        {
+            scope_stack.pop();
+			$$ = $<expr>1;
+        }
+	;
 
 expr_or_empty:
           %prec LOW_PRIO_LEFT
@@ -473,19 +561,19 @@ expr_or_empty:
             }
         ;
  
- list_comprehension_elements:
+ list:
           /* The last set element may not be a "let" (as that would instead
              be parsed as an expression) */
-          TOK_LET '(' arguments_call ')' list_comprehension_elements_p
+          TOK_LET '(' arguments_call ')' list_p
             {
               $$ = new LcLet(*$3, $5, LOC(@$));
               delete $3;
             }
-        | TOK_EACH list_comprehension_elements_or_expr
+        | TOK_EACH list_or_expr
             {
               $$ = new LcEach($2, LOC(@$));
             }
-        | TOK_FOR '(' arguments_call ')' list_comprehension_elements_or_expr
+        | TOK_FOR '(' arguments_call ')' list_or_expr
             {
                 $$ = $5;
 
@@ -498,33 +586,33 @@ expr_or_empty:
                 }
                 delete $3;
             }
-        | TOK_FOR '(' arguments_call ';' expr ';' arguments_call ')' list_comprehension_elements_or_expr
+        | TOK_FOR '(' arguments_call ';' expr ';' arguments_call ')' list_or_expr
             {
               $$ = new LcForC(*$3, *$7, $5, $9, LOC(@$));
                 delete $3;
                 delete $7;
             }
-        | TOK_IF '(' expr ')' list_comprehension_elements_or_expr
+        | TOK_IF '(' expr ')' list_or_expr
             {
               $$ = new LcIf($3, $5, 0, LOC(@$));
             }
-        | TOK_IF '(' expr ')' list_comprehension_elements_or_expr TOK_ELSE list_comprehension_elements_or_expr
+        | TOK_IF '(' expr ')' list_or_expr TOK_ELSE list_or_expr
             {
               $$ = new LcIf($3, $5, $7, LOC(@$));
             }
         ;
 
-// list_comprehension_elements with optional parenthesis
-list_comprehension_elements_p:
-          list_comprehension_elements
-        | '(' list_comprehension_elements ')'
+// list with optional parenthesis
+list_p:
+          list
+        | '(' list ')'
             {
                 $$ = $2;
             }
         ;
 
-list_comprehension_elements_or_expr:
-          list_comprehension_elements_p
+list_or_expr:
+          list_p
         | expr
         ;
 
@@ -539,12 +627,12 @@ vector_expr:
               $$ = new Vector(LOC(@$));
               $$->push_back($1);
             }
-        |  list_comprehension_elements
+        |  list
             {
               $$ = new Vector(LOC(@$));
               $$->push_back($1);
             }
-        | vector_expr ',' optional_commas list_comprehension_elements_or_expr
+        | vector_expr ',' optional_commas list_or_expr
             {
               $$ = $1;
               $$->push_back($4);
@@ -578,7 +666,7 @@ argument_decl:
             }
         | TOK_ID '=' expr
             {
-              $$ = new Assignment($1, shared_ptr<Expression>($3), LOC(@$));
+              $$ = new Assignment($1, std::shared_ptr<Expression>($3), LOC(@$));
                 free($1);
             }
         ;
@@ -605,11 +693,11 @@ arguments_call:
 argument_call:
           expr
             {
-                $$ = new Assignment("", shared_ptr<Expression>($1), LOC(@$));
+                $$ = new Assignment("", std::shared_ptr<Expression>($1), LOC(@$));
             }
         | TOK_ID '=' expr
             {
-                $$ = new Assignment($1, shared_ptr<Expression>($3), LOC(@$));
+                $$ = new Assignment($1, std::shared_ptr<Expression>($3), LOC(@$));
                 free($1);
             }
         ;

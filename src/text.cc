@@ -32,80 +32,93 @@
 
 #include "textnode.h"
 #include "FreetypeRenderer.h"
+#include "FactoryNode.h"
 #include "Polygon2d.h"
+#include "clipper-utils.h"
 
 #include <boost/assign/std/vector.hpp>
 using namespace boost::assign; // bring 'operator+=()' into scope
 
-class TextModule : public AbstractModule
+class TextNode : public FactoryNode
 {
 public:
-	TextModule() : AbstractModule() { }
-	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const;
+	TextNode() : FactoryNode(
+		"text", "size", "font",
+		"spacing", "direction", "language",
+		"script", "halign", "valign",
+		"$fn", "$fs", "$fa") { }
+
+	FreetypeRenderer::Params params;
+
+	double lookup_double_variable_with_default(const Context &c, const std::string &name, double dft)
+	{
+		ValuePtr v = c.lookup_variable(name, true);
+		if (v->isDefinedAs(Value::NUMBER))
+			v->getFiniteDouble(dft);
+		return dft;
+	}
+
+	std::string lookup_string_variable_with_default(const Context &c, const std::string &name, const std::string &dft)
+	{
+		ValuePtr v = c.lookup_variable(name, true);
+		if (v->isDefinedAs(Value::STRING))
+			return v->toString();
+		return dft;
+	}
+
+	void initialize(Context &c, const ModuleContext &evalctx) override
+	{
+		double fn = c.lookup_variable("$fn")->toDouble();
+		double fa = c.lookup_variable("$fa")->toDouble();
+		double fs = c.lookup_variable("$fs")->toDouble();
+
+		this->params.set_fn(fn);
+		this->params.set_fa(fa);
+		this->params.set_fs(fs);
+
+		double size = lookup_double_variable_with_default(c, "size", 10.0);
+		int segments = Calc::get_fragments_from_r(size, fn, fs, fa);
+		// The curved segments of most fonts are relatively short, so
+		// by using a fraction of the number of full circle segments
+		// the resolution will be better matching the detail level of
+		// other objects.
+		int text_segments = std::max(((int)floor(segments / 8)) + 1, 2);
+
+		this->params.set_size(size);
+		this->params.set_segments(text_segments);
+		this->params.set_text(lookup_string_variable_with_default(c, "text", ""));
+		this->params.set_spacing(lookup_double_variable_with_default(c, "spacing", 1.0));
+		this->params.set_font(lookup_string_variable_with_default(c, "font", ""));
+		this->params.set_direction(lookup_string_variable_with_default(c, "direction", ""));
+		this->params.set_language(lookup_string_variable_with_default(c, "language", "en"));
+		this->params.set_script(lookup_string_variable_with_default(c, "script", ""));
+		this->params.set_halign(lookup_string_variable_with_default(c, "halign", "left"));
+		this->params.set_valign(lookup_string_variable_with_default(c, "valign", "baseline"));
+
+		FreetypeRenderer renderer;
+		renderer.detect_properties(this->params);
+	}
+
+	std::vector<const Geometry *> createGeometryList() const
+	{
+		FreetypeRenderer renderer;
+		return renderer.render(this->params);
+	}
+
+	virtual ResultObject processChildren(const NodeGeometries &children) const
+	{
+		std::vector<const Geometry *> geometrylist = createGeometryList();
+		std::vector<shared_ptr<const Polygon2d>> sharedlist;
+		std::vector<const Polygon2d *> polygonlist;
+		for (const auto &geometry : geometrylist) {
+			const Polygon2d *polygon = dynamic_cast<const Polygon2d*>(geometry);
+			assert(polygon);
+			polygonlist.push_back(polygon);
+			sharedlist.push_back(shared_ptr<const Polygon2d>(polygon));
+		}
+		ClipperUtils utils;
+		return ResultObject(utils.apply(polygonlist, ClipperLib::ctUnion));
+	}
 };
 
-AbstractNode *TextModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const
-{
-	TextNode *node = new TextNode(inst);
-
-	AssignmentList args;
-	args += Assignment("text"), Assignment("size"), Assignment("font");
-
-	Context c(ctx);
-	c.setVariables(args, evalctx);
-
-	double fn = c.lookup_variable("$fn")->toDouble();
-	double fa = c.lookup_variable("$fa")->toDouble();
-	double fs = c.lookup_variable("$fs")->toDouble();
-
-	node->params.set_fn(fn);
-	node->params.set_fa(fa);
-	node->params.set_fs(fs);
-
-	double size = lookup_double_variable_with_default(c, "size", 10.0);
-	int segments = Calc::get_fragments_from_r(size, fn, fs, fa);
-	// The curved segments of most fonts are relatively short, so
-	// by using a fraction of the number of full circle segments
-	// the resolution will be better matching the detail level of
-	// other objects.
-	int text_segments = std::max(((int)floor(segments / 8)) + 1, 2);
-
-	node->params.set_size(size);
-	node->params.set_segments(text_segments);
-	node->params.set_text(lookup_string_variable_with_default(c, "text", ""));
-	node->params.set_spacing(lookup_double_variable_with_default(c, "spacing", 1.0));
-	node->params.set_font(lookup_string_variable_with_default(c, "font", ""));
-	node->params.set_direction(lookup_string_variable_with_default(c, "direction", ""));
-	node->params.set_language(lookup_string_variable_with_default(c, "language", "en"));
-	node->params.set_script(lookup_string_variable_with_default(c, "script", ""));
-	node->params.set_halign(lookup_string_variable_with_default(c, "halign", "left"));
-	node->params.set_valign(lookup_string_variable_with_default(c, "valign", "baseline"));
-
-	FreetypeRenderer renderer;
-	renderer.detect_properties(node->params);
-
-	return node;
-}
-
-std::vector<const Geometry *> TextNode::createGeometryList() const
-{
-	FreetypeRenderer renderer;
-	return renderer.render(this->get_params());
-}
-
-FreetypeRenderer::Params TextNode::get_params() const
-{
-	return params;
-}
-
-std::string TextNode::toString() const
-{
-	std::stringstream stream;
-	stream << name() << "(" << this->params << ")";
-	return stream.str();
-}
-
-void register_builtin_text()
-{
-	Builtins::init("text", new TextModule());
-}
+FactoryModule<TextNode> TextNodeFactory("text");

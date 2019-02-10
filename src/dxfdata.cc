@@ -87,7 +87,7 @@ DxfData::DxfData(double fn, double fs, double fa,
 		return;
 	}
 
-	Grid2d< std::vector<int>> grid(GRID_COARSE);
+	Grid2d<std::vector<int>> grid(GRID_COARSE);
 	std::vector<Line> lines;                       // Global lines
 	std::unordered_map< std::string, std::vector<Line>> blockdata; // Lines in blocks
 

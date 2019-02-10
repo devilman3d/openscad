@@ -1,5 +1,44 @@
 #include "Polygon2d.h"
 #include "printutils.h"
+#include "clipper-utils.h"
+#include "calc.h"
+#include "Reindexer.h"
+
+
+double Outline2d::area() const
+{
+	int size = (int)vertices.size();
+	if (size < 3) return 0;
+
+	double a = 0;
+	for (int i = 0, j = size - 1; i < size; ++i) {
+		a += ((double)vertices[j][0] + vertices[i][0]) * ((double)vertices[j][1] - vertices[i][1]);
+		j = i;
+	}
+	return -a * 0.5;
+}
+
+bool Outline2d::is_convex() const
+{
+	const std::vector<Vector2d> &pts = vertices;
+	int N = pts.size();
+
+	// Check for a right turn. This assumes the polygon is simple.
+	for (int i = 0; i < N; i++) {
+		Vector2d d1 = pts[(i + 1) % N] - pts[i];
+		Vector2d d2 = pts[(i + 2) % N] - pts[(i + 1) % N];
+		double zcross = d1[0] * d2[1] - d1[1] * d2[0];
+		if (zcross < 0) return false;
+	}
+	return true;
+}
+
+//template <typename T>
+//void Outline2d::getGrid(Grid2d<T> &grid, const T &value) const
+//{
+//	for (size_t vi = 0; vi < vertices.size(); ++vi)
+//		grid.align(vertices[vi], value);
+//}
 
 /*!
 	Class for holding 2D geometry.
@@ -55,6 +94,14 @@ bool Polygon2d::isEmpty() const
 	return this->theoutlines.empty();
 }
 
+void Polygon2d::offset(double offset, ClipperLib::JoinType joinType, double fn, double fs, double fa)
+{
+	double n = Calc::get_fragments_from_r(std::abs(offset), fn, fs, fa);
+	double arc_tolerance = std::abs(offset) * (1 - cos(M_PI / n));
+	ClipperUtils utils;
+	utils.applyOffset(*this, offset, joinType, 1000000.0, arc_tolerance, *this);
+}
+
 void Polygon2d::transform(const Transform2d &mat)
 {
 	if (mat.matrix().determinant() == 0) {
@@ -94,20 +141,110 @@ void Polygon2d::resize(const Vector2d &newsize, const Eigen::Matrix<bool,2,1> &a
 	this->transform(t);
 }
 
-bool Polygon2d::is_convex() const {
-	if (theoutlines.size() > 1) return false;
-	if (theoutlines.empty()) return true;
-
-	std::vector<Vector2d> const& pts = theoutlines[0].vertices;
-	int N = pts.size();
-
-	// Check for a right turn. This assumes the polygon is simple.
-	for (int i = 0; i < N; i++) {
-		Vector2d d1 = pts[(i+1)%N] - pts[i];
-		Vector2d d2 = pts[(i+2)%N] - pts[(i+1)%N];
-		double zcross = d1[0]*d2[1]-d1[1]*d2[0];
-		if (zcross < 0) return false;
-	}
-	return true;
+bool Polygon2d::is_convex() const
+{
+	if (theoutlines.size() > 1) 
+		return false;
+	if (theoutlines.empty()) 
+		return true;
+	return theoutlines[0].is_convex();
 }
 
+//template <typename T>
+//void Polygon2d::getGrid(Grid2d<T> &grid, const T &value) const
+//{
+//	auto c = theoutlines.size();
+//	for (size_t i = 0; i < c; ++i) {
+//		const auto &outline = theoutlines[i];
+//		const auto &vertices = outline.vertices;
+//		for (size_t vi = 0; vi < vertices.size(); ++vi)
+//			grid.align(vertices[vi], value);
+//	}
+//}
+//
+//const Grid2d<Polygon2d::GridPoint> &Polygon2d::getGridPoints() const
+//{
+//	if (gridPoints.isEmpty()) {
+//		auto c = theoutlines.size();
+//		for (size_t i = 0; i < c; ++i) {
+//			const auto &outline = theoutlines[i];
+//			const auto &vertices = outline.vertices;
+//			for (size_t vi = 0; vi < vertices.size(); ++vi) {
+//				gridPoints.align(vertices[vi], GridPoint(i, vi));
+//			}
+//		}
+//	}
+//	return gridPoints;
+//}
+
+// union
+Polygon2d Polygon2d::UNION(const Polygon2d &other, bool preserveCollinear) const
+{
+	std::vector<const Polygon2d*> polygons;
+	polygons.push_back(this);
+	polygons.push_back(&other);
+	Polygon2d result;
+	ClipperUtils utils;
+	utils.preserveCollinear = preserveCollinear;
+	utils.apply(polygons, ClipperLib::ClipType::ctUnion, result);
+	return result;
+}
+
+// subtraction
+Polygon2d Polygon2d::DIFF(const Polygon2d &other, bool preserveCollinear) const
+{
+	std::vector<const Polygon2d*> polygons;
+	polygons.push_back(this);
+	polygons.push_back(&other);
+	Polygon2d result;
+	ClipperUtils utils;
+	utils.preserveCollinear = preserveCollinear;
+	utils.apply(polygons, ClipperLib::ClipType::ctDifference, result);
+	return result;
+}
+
+// xor
+Polygon2d Polygon2d::XOR(const Polygon2d &other, bool preserveCollinear) const
+{
+	std::vector<const Polygon2d*> polygons;
+	polygons.push_back(this);
+	polygons.push_back(&other);
+	Polygon2d result;
+	ClipperUtils utils;
+	utils.preserveCollinear = preserveCollinear;
+	utils.apply(polygons, ClipperLib::ClipType::ctXor, result);
+	return result;
+}
+
+// intersection
+Polygon2d Polygon2d::INTERSECT(const Polygon2d &other, bool preserveCollinear) const
+{
+	std::vector<const Polygon2d*> polygons;
+	polygons.push_back(this);
+	polygons.push_back(&other);
+	Polygon2d result;
+	ClipperUtils utils;
+	utils.preserveCollinear = preserveCollinear;
+	utils.apply(polygons, ClipperLib::ClipType::ctIntersection, result);
+	return result;
+}
+
+Polygon2d Polygon2d::operator+(const Polygon2d &other) const
+{
+	return UNION(other);
+}
+
+Polygon2d Polygon2d::operator-(const Polygon2d &other) const
+{
+	return DIFF(other);
+}
+
+Polygon2d Polygon2d::operator%(const Polygon2d &other) const
+{
+	return XOR(other);
+}
+
+Polygon2d Polygon2d::operator*(const Polygon2d &other) const
+{
+	return INTERSECT(other);
+}

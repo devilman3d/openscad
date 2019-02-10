@@ -3,12 +3,13 @@
 #include "module.h"
 #include "modcontext.h"
 #include "annotation.h"
+#include "expressions.h"
 
 ParameterObject::ParameterObject() : focus(false)
 {
 }
 
-void ParameterObject::applyParameter(Assignment &assignment)
+void ParameterObject::applyParameter(Parameter &assignment)
 {
   ModuleContext ctx;
   const ValuePtr defaultValue = assignment.expr->evaluate(&ctx);
@@ -43,7 +44,7 @@ int ParameterObject::setValue(const class ValuePtr defaultValue, const class Val
   return target;
 }
 
-void ParameterObject::setAssignment(Context *ctx, const Assignment *assignment, const ValuePtr defaultValue)
+void ParameterObject::setAssignment(Context *ctx, const Parameter *assignment, const ValuePtr defaultValue)
 {
   name = assignment->name;
   const Annotation *param = assignment->annotation("Parameter");

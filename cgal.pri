@@ -11,7 +11,7 @@ cgal {
   }
 
   CONFIG(mingw-cross-env)|CONFIG(mingw-cross-env-shared) {
-    LIBS += -lgmp -lmpfr -lCGAL
+    LIBS += -lgmp -lmpfr -lCGAL -lCGAL_Core
     QMAKE_CXXFLAGS += -frounding-math 
   } else {
     win* {
@@ -21,7 +21,7 @@ cgal {
     } else {
       QMAKE_CXXFLAGS += -frounding-math 
     }
-    LIBS += -lCGAL -lmpfr -lgmp
+    LIBS += -lCGAL -lCGAL_Core -lmpfr -lgmp
   }
 
   *clang* {

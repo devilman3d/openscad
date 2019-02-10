@@ -39,6 +39,8 @@ namespace fs=boost::filesystem;
 /*Unicode support for string lengths and array accesses*/
 #include <glib.h>
 
+#include "expression.h"
+
 Value Value::undefined;
 ValuePtr ValuePtr::undefined;
 
@@ -95,46 +97,107 @@ std::ostream &operator<<(std::ostream &stream, const QuotedString &s)
 Value::Value() : value(boost::blank())
 {
   //  std::cout << "creating undef\n";
+	debugValue = this->toString();
 }
 
-Value::Value(bool v) : value(v)
+Value::Value(bool v) : value((bool)v)
 {
   //  std::cout << "creating bool\n";
+	debugValue = this->toString();
 }
 
 Value::Value(int v) : value(double(v))
 {
   //  std::cout << "creating int\n";
+	debugValue = this->toString();
 }
 
-Value::Value(double v) : value(v)
+Value::Value(double v) : value((double)v)
 {
   //  std::cout << "creating double " << v << "\n";
+	debugValue = this->toString();
 }
 
 Value::Value(const std::string &v) : value(v)
 {
   //  std::cout << "creating string\n";
+	debugValue = this->toString();
 }
 
 Value::Value(const char *v) : value(std::string(v))
 {
   //  std::cout << "creating string from char *\n";
+	debugValue = this->toString();
 }
 
 Value::Value(char v) : value(std::string(1, v))
 {
   //  std::cout << "creating string from char\n";
+	debugValue = this->toString();
 }
 
 Value::Value(const VectorType &v) : value(v)
 {
   //  std::cout << "creating vector\n";
+	debugValue = this->toString();
 }
 
 Value::Value(const RangeType &v) : value(v)
 {
-  //  std::cout << "creating range\n";
+	//  std::cout << "creating range\n";
+	debugValue = this->toString();
+}
+
+Value::Value(const ScopeType &v) : value(v)
+{
+	//  std::cout << "creating range\n";
+	debugValue = this->toString();
+}
+
+template <typename VT, int N>
+Value::VectorType makeVectorType(const Eigen::Matrix<VT, N, 1> &v)
+{
+	Value::VectorType result;
+	for (auto r = 0; r < N; ++r)
+		result.push_back(v[r]);
+	return result;
+}
+
+Value::Value(const Vector3d &v) : value(makeVectorType(v))
+{
+	//  std::cout << "creating vector3d\n";
+	debugValue = this->toString();
+}
+
+Value::Value(const Vector4d &v) : value(makeVectorType(v))
+{
+	//  std::cout << "creating vector4d\n";
+	debugValue = this->toString();
+}
+
+Value::Value(const Vector3f &v) : value(makeVectorType(v))
+{
+	//  std::cout << "creating vector3f\n";
+	debugValue = this->toString();
+}
+
+Value::Value(const Vector4f &v) : value(makeVectorType(v))
+{
+	//  std::cout << "creating vector4f\n";
+	debugValue = this->toString();
+}
+
+Value::Value(const Transform3d &v)
+{
+	VectorType rows;
+	for (int r = 0; r < 4; ++r) {
+		VectorType row;
+		for (int c = 0; c < 4; ++c)
+			row.push_back(v(r, c));
+		rows.push_back(row);
+	}
+	value = rows;
+	debugValue = this->toString();
 }
 
 Value::ValueType Value::type() const
@@ -170,15 +233,18 @@ bool Value::toBool() const
     return boost::get<std::string>(this->value).size() > 0;
     break;
   case VECTOR:
-    return boost::get<VectorType >(this->value).size() > 0;
-    break;
+	  return boost::get<VectorType>(this->value).size() > 0;
+	  break;
+  case STRUCT:
+	  // todo: what does this mean?
+	  break;
   case RANGE:
     return true;
     break;
   default:
-    return false;
     break;
   }
+  return false;
 }
 
 double Value::toDouble() const
@@ -243,14 +309,22 @@ public:
   }
 
   std::string operator()(const Value::VectorType &v) const {
-    std::stringstream stream;
-    stream << '[';
-    for (size_t i = 0; i < v.size(); i++) {
-      if (i > 0) stream << ", ";
-      stream << *v[i];
-    }
-    stream << ']';
-    return stream.str();
+	  std::stringstream stream;
+	  stream << '[';
+	  for (size_t i = 0; i < v.size(); i++) {
+		  if (i > 0) stream << ", ";
+		  stream << *v[i];
+	  }
+	  stream << ']';
+	  return stream.str();
+  }
+
+  std::string operator()(const Value::ScopeType &v) const {
+	  std::stringstream stream;
+	  stream << "{ ";
+	  stream << v.dump("");
+	  stream << " }";
+	  return stream.str();
   }
 
   std::string operator()(const RangeType &v) const {
@@ -271,7 +345,8 @@ std::string Value::toEchoString() const
 {
 	if (type() == Value::STRING) {
 		return std::string("\"") + toString() + '"';
-	} else {
+	}
+	else {
 		return toString();
 	}
 }
@@ -331,11 +406,11 @@ std::string Value::chrString() const
 
 const Value::VectorType &Value::toVector() const
 {
-  static VectorType empty;
-  
-  const VectorType *v = boost::get<VectorType>(&this->value);
-  if (v) return *v;
-  else return empty;
+	static VectorType empty;
+
+	const VectorType *v = boost::get<VectorType>(&this->value);
+	if (v) return *v;
+	else return empty;
 }
 
 bool Value::getVec2(double &x, double &y, bool ignoreInfinite) const
@@ -361,20 +436,65 @@ bool Value::getVec2(double &x, double &y, bool ignoreInfinite) const
 
 bool Value::getVec3(double &x, double &y, double &z, double defaultval) const
 {
-  if (this->type() != VECTOR) return false;
+	if (this->type() != VECTOR) return false;
 
-  const VectorType &v = toVector();
+	const VectorType &v = toVector();
 
-  if (v.size() == 2) {
-    getVec2(x, y);
-    z = defaultval;
-    return true;
-  }
-  else {
-    if (v.size() != 3) return false;
-  }
+	if (v.size() == 2) {
+		getVec2(x, y);
+		z = defaultval;
+		return true;
+	}
+	else {
+		if (v.size() != 3) return false;
+	}
 
-  return (v[0]->getDouble(x) && v[1]->getDouble(y) && v[2]->getDouble(z));
+	return (v[0]->getDouble(x) && v[1]->getDouble(y) && v[2]->getDouble(z));
+}
+
+bool Value::getVec4(double &x, double &y, double &z, double &w, double defaultval) const
+{
+	if (this->type() != VECTOR) return false;
+
+	const VectorType &v = toVector();
+
+	if (v.size() == 2) {
+		getVec2(x, y);
+		z = defaultval;
+		w = defaultval;
+		return true;
+	}
+	else if (v.size() == 3) {
+		getVec2(x, y, z);
+		w = defaultval;
+		return true;
+	} 
+	else {
+		if (v.size() != 4) return false;
+	}
+
+	return (v[0]->getDouble(x) && v[1]->getDouble(y) && v[2]->getDouble(z) && v[3]->getDouble(w));
+}
+
+bool Value::getTransform(Transform3d &m) const
+{
+	if (this->type() != VECTOR) return false;
+
+	const VectorType &v = toVector();
+		
+	if (v.size() != 4) return false;
+
+	for (int r = 0; r < 4; ++r) {
+		ValuePtr row = v[r];
+		double x, y, z, w;
+		if (!v[r]->getVec4(x, y, z, w))
+			return false;
+		m(r, 0) = x;
+		m(r, 1) = y;
+		m(r, 2) = z;
+		m(r, 3) = w;
+	}
+	return true;
 }
 
 RangeType Value::toRange() const
@@ -384,6 +504,15 @@ RangeType Value::toRange() const
     return *val;
   }
   else return RangeType(0,0,0);
+}
+
+const Value::ScopeType &Value::toStruct() const
+{
+	static ScopeType empty;
+
+	const ScopeType *v = boost::get<ScopeType>(&this->value);
+	if (v) return *v;
+	else return empty;
 }
 
 Value &Value::operator=(const Value &v)
@@ -487,6 +616,11 @@ public:
 			sum.push_back(ValuePtr(*op1[i] + *op2[i]));
 		}
 		return Value(sum);
+	}
+
+	// combine two scopes
+	Value operator()(const Value::ScopeType &op1, const Value::ScopeType &op2) const {
+		return Value(op1 + op2);
 	}
 };
 
@@ -600,9 +734,11 @@ Value Value::operator*(const Value &v) const
 			return Value(r);
 		} else if (vec1[0]->type() == VECTOR && vec2[0]->type() == NUMBER &&
 							 vec1[0]->toVector().size() == vec2.size()) {
+			// Matrix * vector
 			return multmatvec(vec1, vec2);
 		} else if (vec1[0]->type() == NUMBER && vec2[0]->type() == VECTOR &&
 							 vec1.size() == vec2.size()) {
+			// Vector * matrix
 			return multvecmat(vec1, vec2);
 		} else if (vec1[0]->type() == VECTOR && vec2[0]->type() == VECTOR &&
 							 vec1[0]->toVector().size() == vec2.size()) {
@@ -622,9 +758,11 @@ Value Value::operator*(const Value &v) const
 Value Value::operator/(const Value &v) const
 {
   if (this->type() == NUMBER && v.type() == NUMBER) {
+	  // scalar / scalar
     return Value(this->toDouble() / v.toDouble());
   }
   else if (this->type() == VECTOR && v.type() == NUMBER) {
+	  // vector / scalar
     const VectorType &vec = this->toVector();
     VectorType dstv;
     for(const auto &vecval : vec) {
@@ -633,6 +771,7 @@ Value Value::operator/(const Value &v) const
     return Value(dstv);
   }
   else if (this->type() == NUMBER && v.type() == VECTOR) {
+	  // scalar / vector
     const VectorType &vec = v.toVector();
     VectorType dstv;
     for(const auto &vecval : vec) {
@@ -838,51 +977,97 @@ bool RangeType::iterator::operator!=(const self_type &other) const
 ValuePtr::ValuePtr()
 {
 	this->reset(new Value());
+	this->debugValue = get()->toString();
 }
 
 ValuePtr::ValuePtr(const Value &v)
 {
 	this->reset(new Value(v));
+	this->debugValue = get()->toString();
 }
 
 ValuePtr::ValuePtr(bool v)
 {
 	this->reset(new Value(v));
+	this->debugValue = get()->toString();
 }
 
 ValuePtr::ValuePtr(int v)
 {
 	this->reset(new Value(v));
+	this->debugValue = get()->toString();
 }
 
 ValuePtr::ValuePtr(double v)
 {
 	this->reset(new Value(v));
+	this->debugValue = get()->toString();
 }
 
 ValuePtr::ValuePtr(const std::string &v)
 {
 	this->reset(new Value(v));
+	this->debugValue = get()->toString();
 }
 
 ValuePtr::ValuePtr(const char *v)
 {
 	this->reset(new Value(v));
+	this->debugValue = get()->toString();
 }
 
 ValuePtr::ValuePtr(const char v)
 {
 	this->reset(new Value(v));
+	this->debugValue = get()->toString();
 }
 
 ValuePtr::ValuePtr(const Value::VectorType &v)
 {
 	this->reset(new Value(v));
+	this->debugValue = get()->toString();
 }
 
 ValuePtr::ValuePtr(const RangeType &v)
 {
 	this->reset(new Value(v));
+	this->debugValue = get()->toString();
+}
+
+ValuePtr::ValuePtr(const Value::ScopeType &v)
+{
+	this->reset(new Value(v));
+	this->debugValue = get()->toString();
+}
+
+ValuePtr::ValuePtr(const Vector3d &v)
+{
+	this->reset(new Value(v));
+	this->debugValue = get()->toString();
+}
+
+ValuePtr::ValuePtr(const Vector4d &v)
+{
+	this->reset(new Value(v));
+	this->debugValue = get()->toString();
+}
+
+ValuePtr::ValuePtr(const Vector3f &v)
+{
+	this->reset(new Value(v));
+	this->debugValue = get()->toString();
+}
+
+ValuePtr::ValuePtr(const Vector4f &v)
+{
+	this->reset(new Value(v));
+	this->debugValue = get()->toString();
+}
+
+ValuePtr::ValuePtr(const Transform3d &v)
+{
+	this->reset(new Value(v));
+	this->debugValue = get()->toString();
 }
 
 bool ValuePtr::operator==(const ValuePtr &v) const

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <map>
 #include <string>
 #include <algorithm>
 #include <limits>
@@ -12,6 +13,9 @@
 #endif
 #include <cstdint>
 #include "memory.h"
+#include "linalg.h"
+
+#include "localscope.h"
 
 class QuotedString : public std::string
 {
@@ -110,6 +114,12 @@ public:
   ValuePtr(const char v);
   ValuePtr(const class std::vector<ValuePtr> &v);
   ValuePtr(const class RangeType &v);
+  ValuePtr(const class LocalScope &v);
+  ValuePtr(const Vector3d &v);
+  ValuePtr(const Vector4d &v);
+  ValuePtr(const Vector3f &v);
+  ValuePtr(const Vector4f &v);
+  ValuePtr(const Transform3d &v);
 
 	operator bool() const;
 
@@ -131,12 +141,15 @@ public:
   const Value &operator*() const;
 
 private:
+	std::string debugValue;
 };
 
 class Value
 {
 public:
+
 	typedef std::vector<ValuePtr> VectorType;
+	typedef LocalScope ScopeType;
 
   enum ValueType {
     UNDEFINED,
@@ -144,7 +157,8 @@ public:
     NUMBER,
     STRING,
     VECTOR,
-    RANGE
+	RANGE,
+	STRUCT
   };
   static Value undefined;
 
@@ -157,6 +171,12 @@ public:
   Value(const char v);
   Value(const VectorType &v);
   Value(const RangeType &v);
+  Value(const ScopeType &v);
+  Value(const Vector3d &v);
+  Value(const Vector4d &v);
+  Value(const Vector3f &v);
+  Value(const Vector4f &v);
+  Value(const Transform3d &v);
   ~Value() {}
 
   ValueType type() const;
@@ -174,7 +194,10 @@ public:
   const VectorType &toVector() const;
   bool getVec2(double &x, double &y, bool ignoreInfinite = false) const;
   bool getVec3(double &x, double &y, double &z, double defaultval = 0.0) const;
+  bool getVec4(double &x, double &y, double &z, double &w, double defaultval = 0.0) const;
+  bool getTransform(Transform3d &m) const;
   RangeType toRange() const;
+  const ScopeType &toStruct() const;
 
 	operator bool() const { return this->toBool(); }
 
@@ -199,7 +222,7 @@ public:
     return stream;
   }
 
-  typedef boost::variant< boost::blank, bool, double, std::string, VectorType, RangeType > Variant;
+  typedef boost::variant< boost::blank, bool, double, std::string, VectorType, RangeType, ScopeType > Variant;
 
 private:
   static Value multvecnum(const Value &vecval, const Value &numval);
@@ -207,5 +230,6 @@ private:
   static Value multvecmat(const VectorType &vectorvec, const VectorType &matrixvec);
 
   Variant value;
+  std::string debugValue;
 };
 

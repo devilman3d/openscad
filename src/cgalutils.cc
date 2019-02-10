@@ -10,6 +10,7 @@
 #include "polyset-utils.h"
 #include "grid.h"
 #include "node.h"
+#include "progress.h"
 
 #include "cgal.h"
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
@@ -41,8 +42,7 @@ static CGAL_Nef_polyhedron *createNefPolyhedronFromPolySet(const PolySet &ps)
 
 	// Since is_convex doesn't work well with non-planar faces,
 	// we tessellate the polyset before checking.
-	PolySet psq(ps);
-	psq.quantizeVertices();
+	QuantizedPolySet psq(ps);
 	PolySet ps_tri(3, psq.convexValue());
 	PolysetUtils::tessellate_faces(psq, ps_tri);
 	if (ps_tri.is_convex()) {
@@ -52,7 +52,7 @@ static CGAL_Nef_polyhedron *createNefPolyhedronFromPolySet(const PolySet &ps)
 		// NB! CGAL's convex_hull_3() doesn't like std::set iterators, so we use a list
 		// instead.
 		std::list<K::Point_3> points;
-		for(const auto &poly : psq.polygons) {
+		for(const auto &poly : psq.getPolygons()) {
 			for(const auto &p : poly) {
 				points.push_back(vector_convert<K::Point_3>(p));
 			}
@@ -65,12 +65,13 @@ static CGAL_Nef_polyhedron *createNefPolyhedronFromPolySet(const PolySet &ps)
 		CGAL::convex_hull_3(points.begin(), points.end(), r);
 		CGAL_Polyhedron r_exact;
 		CGALUtils::copyPolyhedron(r, r_exact);
-		return new CGAL_Nef_polyhedron(new CGAL_Nef_polyhedron3(r_exact));
+		shared_ptr<CGAL_Nef_polyhedron3> res = std::make_shared<CGAL_Nef_polyhedron3>(r_exact);
+		return new CGAL_Nef_polyhedron(res, ps);
 	}
 
-	CGAL_Nef_polyhedron3 *N = NULL;
+	shared_ptr<CGAL_Nef_polyhedron3> N;
 	bool plane_error = false;
-	CGALUtils::lockErrors(CGAL::THROW_EXCEPTION);
+	CGALUtils::ErrorLocker errorLocker;
 	try {
 		CGAL_Polyhedron P;
 		bool err = CGALUtils::createPolyhedronFromPolySet(psq, P);
@@ -79,7 +80,10 @@ static CGAL_Nef_polyhedron *createNefPolyhedronFromPolySet(const PolySet &ps)
 		 	PRINTDB("Polyhedron is valid: %d", P.is_valid(false, 0));
 		 }
 
-		if (!err) N = new CGAL_Nef_polyhedron3(P);
+		 if (!err) {
+			 LocalProgress progress("Nef", P.size_of_vertices());
+			 N = std::make_shared<CGAL_Nef_polyhedron3>(P);
+		 }
 	}
 	catch (const CGAL::Assertion_exception &e) {
 		if (std::string(e.what()).find("Plane_constructor")!=std::string::npos &&
@@ -90,20 +94,27 @@ static CGAL_Nef_polyhedron *createNefPolyhedronFromPolySet(const PolySet &ps)
 			PRINTB("ERROR: CGAL error in CGAL_Nef_polyhedron3(): %s", e.what());
 		}
 	}
-	if (plane_error) try {
+	if (plane_error) {
+		try {
 			CGAL_Polyhedron P;
 			bool err = CGALUtils::createPolyhedronFromPolySet(ps_tri, P);
-            if (!err) {
-                PRINTDB("Polyhedron is closed: %d", P.is_closed());
-                PRINTDB("Polyhedron is valid: %d", P.is_valid(false, 0));
-            }
-			if (!err) N = new CGAL_Nef_polyhedron3(P);
+			if (!err) {
+				PRINTDB("Polyhedron is closed: %d", P.is_closed());
+				PRINTDB("Polyhedron is valid: %d", P.is_valid(false, 0));
+			}
+			if (!err) {
+				LocalProgress progress("Nef", P.size_of_vertices());
+				N = std::make_shared<CGAL_Nef_polyhedron3>(P);
+			}
 		}
 		catch (const CGAL::Assertion_exception &e) {
 			PRINTB("ERROR: Alternate construction failed. CGAL error in CGAL_Nef_polyhedron3(): %s", e.what());
 		}
-	CGALUtils::unlockErrors();
-	return new CGAL_Nef_polyhedron(N);
+	}
+	if (N)
+		return new CGAL_Nef_polyhedron(N, ps);
+
+	return nullptr;
 }
 
 static CGAL_Nef_polyhedron *createNefPolyhedronFromPolygon2d(const Polygon2d &polygon)
@@ -167,16 +178,21 @@ namespace CGALUtils {
 		typedef std::pair<Vector3d,Vector3d> Edge;
 		typedef std::map<Edge, int, VecPairCompare> Edge_to_facet_map;
 		Edge_to_facet_map edge_to_facet_map;
-		std::vector<Plane> facet_planes; facet_planes.reserve(ps.polygons.size());
 
-		for (size_t i = 0; i < ps.polygons.size(); i++) {
+		auto &psp = ps.getPolygons();
+
+		std::vector<Plane> facet_planes; facet_planes.reserve(psp.size());
+
+		for (size_t i = 0; i < psp.size(); i++) {
+			if (psp[i].open)
+				continue;
 			Plane plane;
-			size_t N = ps.polygons[i].size();
+			size_t N = psp[i].size();
 			if (N >= 3) {
 				std::vector<Point> v(N);
 				for (size_t j = 0; j < N; j++) {
-					v[j] = vector_convert<Point>(ps.polygons[i][j]);
-					Edge edge(ps.polygons[i][j],ps.polygons[i][(j+1)%N]);
+					v[j] = vector_convert<Point>(psp[i][j]);
+					Edge edge(psp[i][j],psp[i][(j+1)%N]);
 					if (edge_to_facet_map.count(edge)) return false; // edge already exists: nonmanifold
 					edge_to_facet_map[edge] = i;
 				}
@@ -187,18 +203,20 @@ namespace CGALUtils {
 			facet_planes.push_back(plane);
 		}
 
-		for (size_t i = 0; i < ps.polygons.size(); i++) {
-			size_t N = ps.polygons[i].size();
+		for (size_t i = 0; i < psp.size(); i++) {
+			if (psp[i].open)
+				continue;
+			size_t N = psp[i].size();
 			if (N < 3) continue;
 			for (size_t j = 0; j < N; j++) {
-				Edge other_edge(ps.polygons[i][(j+1)%N], ps.polygons[i][j]);
+				Edge other_edge(psp[i][(j+1)%N], psp[i][j]);
 				if (edge_to_facet_map.count(other_edge) == 0) return false;//
 				//Edge_to_facet_map::const_iterator it = edge_to_facet_map.find(other_edge);
 				//if (it == edge_to_facet_map.end()) return false; // not a closed manifold
 				//int other_facet = it->second;
 				int other_facet = edge_to_facet_map[other_edge];
 
-				Point p = vector_convert<Point>(ps.polygons[i][(j+2)%N]);
+				Point p = vector_convert<Point>(psp[i][(j+2)%N]);
 
 				if (facet_planes[other_facet].has_on_positive_side(p)) {
 					// Check angle
@@ -221,9 +239,9 @@ namespace CGALUtils {
 		while(!facets_to_visit.empty()) {
 			int f = facets_to_visit.front(); facets_to_visit.pop();
 
-			for (size_t i = 0; i < ps.polygons[f].size(); i++) {
-				int j = (i+1) % ps.polygons[f].size();
-				Edge_to_facet_map::iterator it = edge_to_facet_map.find(Edge(ps.polygons[f][j], ps.polygons[f][i]));
+			for (size_t i = 0; i < psp[f].size(); i++) {
+				int j = (i+1) % psp[f].size();
+				Edge_to_facet_map::iterator it = edge_to_facet_map.find(Edge(psp[f][j], psp[f][i]));
 				if (it == edge_to_facet_map.end()) return false; // Nonmanifold
 				if (!explored_facets.count(it->second)) {
 					explored_facets.insert(it->second);
@@ -233,7 +251,7 @@ namespace CGALUtils {
 		}
 
 		// Make sure that we were able to reach all polygons during our visit
-		return explored_facets.size() == ps.polygons.size();
+		return explored_facets.size() == psp.size();
 	}
 
 
@@ -241,6 +259,7 @@ namespace CGALUtils {
 	{
 		const PolySet *ps = dynamic_cast<const PolySet*>(&geom);
 		if (ps) {
+			PRINT("Creating NEF polyhedron from PolySet");
 			return createNefPolyhedronFromPolySet(*ps);
 		}
 		else {
@@ -688,6 +707,15 @@ namespace CGALUtils {
 	}
 #endif // createPolySetFromNefPolyhedron3
 
+	PolySet *createPolySetFromNefPolyhedron(const CGAL_Nef_polyhedron &N)
+	{
+		PolySet *result = new PolySet(3);
+		bool err = createPolySetFromNefPolyhedron3(*N, *result);
+		if (!err)
+			return result;
+		delete result;
+		return nullptr;
+	}
 
 }; // namespace CGALUtils
 

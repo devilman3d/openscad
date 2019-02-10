@@ -1,44 +1,160 @@
+#define FORCE_CGAL_PROFILE
+
 #include "CGAL_Nef_polyhedron.h"
 #include "cgal.h"
 #include "cgalutils.h"
 #include "printutils.h"
 #include "polyset.h"
 #include "svg.h"
+#include "spinlock_pool_multi.h"
 
-CGAL_Nef_polyhedron::CGAL_Nef_polyhedron(CGAL_Nef_polyhedron3 *p)
-{
-	if (p) p3.reset(p);
+typedef CGAL::spinlock_pool_multi<2> NefPolyhedron_lock_pool;
+typedef NefPolyhedron_lock_pool::scoped_lock NefPolyhedron_scoped_lock;
+
+// CGAL_Nef_polyhedron3 <- CGAL::Nef_polyhedron3
+CGAL_Nef_polyhedron3::CGAL_Nef_polyhedron3(const SNC_structure& W, const SNC_point_locator* _pl)
+	: CGAL::Nef_polyhedron_3<CGAL_Kernel3>(EMPTY) {
+	// clone snc
+	{
+		NefPolyhedron_scoped_lock lock(&W);
+		snc() = W;
+	}
+	// clone pl
+	SNC_point_locator* old_pl = pl();
+	{
+		NefPolyhedron_scoped_lock lock(_pl);
+		pl() = _pl->clone();
+	}
+	set_snc(snc());
+	pl()->initialize(&snc());
+	delete old_pl;
+	CGAL_assertion(this->unique() && "Created a non-unique cloned polyhedron");
 }
 
-// Copy constructor
+CGAL_Nef_polyhedron3::CGAL_Nef_polyhedron3(Content space /*= Content::EMPTY*/)
+	: CGAL::Nef_polyhedron_3<CGAL_Kernel3>(space) {
+	CGAL_assertion(this->unique() && "Created a non-unique empty polyhedron");
+}
+
+CGAL_Nef_polyhedron3::CGAL_Nef_polyhedron3(const CGAL::Nef_polyhedron_3<CGAL_Kernel3> &p)
+	: CGAL::Nef_polyhedron_3<CGAL_Kernel3>(p) {
+	CGAL_assertion(!this->unique() && !p.unique() && "Created a unique polyhedron reference");
+}
+
+CGAL_Nef_polyhedron3::CGAL_Nef_polyhedron3(const CGAL_Nef_polyhedron3 &p)
+	: CGAL_Nef_polyhedron3(p.snc(), p.pl()) {
+	// TODO: isn't this already asserted in the private constructor???
+	CGAL_assertion(this->unique() && "Created a non-unique copied polyhedron");
+}
+
+// CGAL_Nef_polyhedron
+
+CGAL_Nef_polyhedron::CGAL_Nef_polyhedron()
+{
+	type = "Nef";
+	this->p3 = std::make_shared<CGAL_Nef_polyhedron3>();
+	data.nef = this;
+}
+
+CGAL_Nef_polyhedron::CGAL_Nef_polyhedron(const shared_ptr<CGAL_Nef_polyhedron3> &p3)
+{
+	assert(p3 && "Creating a null Nef");
+	this->p3 = std::make_shared<CGAL_Nef_polyhedron3>(*p3);
+	type = "Nef: shared<p3>";
+	data.nef = this;
+}
+
+CGAL_Nef_polyhedron::CGAL_Nef_polyhedron(const shared_ptr<CGAL_Nef_polyhedron3> &p3, const PolySet &ps)
+{
+	assert(p3 && "Creating a null Nef");
+	this->p3 = std::make_shared<CGAL_Nef_polyhedron3>(*p3);
+	type = "Nef: shared<p3> and PolySet";
+	data = ps.data;
+	data.nef = this;
+}
+
+CGAL_Nef_polyhedron::CGAL_Nef_polyhedron(const CGAL_Nef_polyhedron3 &p3)
+{
+	this->p3 = std::make_shared<CGAL_Nef_polyhedron3>(p3);
+	type = "Nef: const &p3";
+	data.nef = this;
+}
+
 CGAL_Nef_polyhedron::CGAL_Nef_polyhedron(const CGAL_Nef_polyhedron &src)
 {
-	if (src.p3) this->p3.reset(new CGAL_Nef_polyhedron3(*src.p3));
+	assert(src.p3 && "Creating a null Nef");
+	this->p3 = std::make_shared<CGAL_Nef_polyhedron3>(*src.p3);
+	type = "Nef: const &src";
+	data = src.data;
+	data.nef = this;
 }
 
-CGAL_Nef_polyhedron& CGAL_Nef_polyhedron::operator+=(const CGAL_Nef_polyhedron &other)
+//CGAL_Nef_polyhedron &CGAL_Nef_polyhedron::operator=(const CGAL_Nef_polyhedron &src)
+//{
+//	if (src.p3)
+//		this->p3 = std::make_shared<CGAL_Nef_polyhedron3>(*src.p3);
+//	else
+//		this->p3.reset();
+//	data = src.data;
+//	data.nef = this;
+//	return *this;
+//}
+
+CGAL_Nef_polyhedron *CGAL_Nef_polyhedron::operator+(const CGAL_Nef_polyhedron &other) const
 {
-	(*this->p3) += (*other.p3);
-	return *this;
+	CGAL_Nef_polyhedron3 tmp = this->p3->join(*other.p3);
+	return new CGAL_Nef_polyhedron(tmp);
 }
 
-CGAL_Nef_polyhedron& CGAL_Nef_polyhedron::operator*=(const CGAL_Nef_polyhedron &other)
+//CGAL_Nef_polyhedron& CGAL_Nef_polyhedron::operator+=(const CGAL_Nef_polyhedron &other)
+//{
+//	CGAL_Nef_polyhedron3 tmp = *this->p3 + *other.p3;
+//	this->p3 = std::make_shared<CGAL_Nef_polyhedron3>(tmp);
+//	data.reset(this);
+//	return *this;
+//}
+
+CGAL_Nef_polyhedron *CGAL_Nef_polyhedron::intersection(const CGAL_Nef_polyhedron &other) const 
 {
-	(*this->p3) *= (*other.p3);
-	return *this;
+	CGAL_Nef_polyhedron3 tmp = this->p3->intersection(*other.p3);
+	return new CGAL_Nef_polyhedron(tmp);
 }
 
-CGAL_Nef_polyhedron& CGAL_Nef_polyhedron::operator-=(const CGAL_Nef_polyhedron &other)
+//CGAL_Nef_polyhedron& CGAL_Nef_polyhedron::operator*=(const CGAL_Nef_polyhedron &other)
+//{
+//	CGAL_Nef_polyhedron3 tmp = *this->p3 * *other.p3;
+//	this->p3 = std::make_shared<CGAL_Nef_polyhedron3>(tmp);
+//	data.reset(this);
+//	return *this;
+//}
+
+CGAL_Nef_polyhedron *CGAL_Nef_polyhedron::difference(const CGAL_Nef_polyhedron &other) const 
 {
-	(*this->p3) -= (*other.p3);
-	return *this;
+	CGAL_Nef_polyhedron3 tmp = this->p3->difference(*other.p3);
+	return new CGAL_Nef_polyhedron(tmp);
 }
 
-CGAL_Nef_polyhedron &CGAL_Nef_polyhedron::minkowski(const CGAL_Nef_polyhedron &other)
+//CGAL_Nef_polyhedron& CGAL_Nef_polyhedron::operator-=(const CGAL_Nef_polyhedron &other)
+//{
+//	CGAL_Nef_polyhedron3 tmp = *this->p3 - *other.p3;
+//	this->p3 = std::make_shared<CGAL_Nef_polyhedron3>(tmp);
+//	data.reset(this);
+//	return *this;
+//}
+
+CGAL_Nef_polyhedron *CGAL_Nef_polyhedron::minkowski(const CGAL_Nef_polyhedron &other) const 
 {
-	(*this->p3) = CGAL::minkowski_sum_3(*this->p3, *other.p3);
-	return *this;
+	CGAL_Nef_polyhedron3 tmp = CGAL::minkowski_sum_3(*this->p3, *other.p3);
+	return new CGAL_Nef_polyhedron(tmp);
 }
+
+//CGAL_Nef_polyhedron &CGAL_Nef_polyhedron::minkowski(const CGAL_Nef_polyhedron &other)
+//{
+//	CGAL_Nef_polyhedron3 tmp = CGAL::minkowski_sum_3(*this->p3, *other.p3);
+//	this->p3 = std::make_shared<CGAL_Nef_polyhedron3>(tmp);
+//	data.reset(this);
+//	return *this;
+//}
 
 size_t CGAL_Nef_polyhedron::memsize() const
 {
@@ -49,52 +165,24 @@ size_t CGAL_Nef_polyhedron::memsize() const
 	return memsize;
 }
 
+BoundingBox CGAL_Nef_polyhedron::getBoundingBox() const {
+	if (this->isEmpty()) return BoundingBox();
+
+	auto bb = CGALUtils::boundingBox(*p3);
+	Vector3d min(bb.xmin().to_double(), bb.ymin().to_double(), bb.zmin().to_double());
+	Vector3d max(bb.xmax().to_double(), bb.ymax().to_double(), bb.zmax().to_double());
+
+	BoundingBox result(min, max);
+	return result;
+}
+
 bool CGAL_Nef_polyhedron::isEmpty() const
 {
 	return !this->p3 || this->p3->is_empty();
 }
 
-/*!
-	Creates a new PolySet and initializes it with the data from this polyhedron
-
-	Note: Can return NULL if an error occurred
-*/
-// FIXME: Deprecated by CGALUtils::createPolySetFromNefPolyhedron3
-#if 0
-PolySet *CGAL_Nef_polyhedron::convertToPolyset() const
-{
-	if (this->isEmpty()) return new PolySet(3);
-	PolySet *ps = NULL;
-	CGALUtils::lockErrors(CGAL::THROW_EXCEPTION);
-	ps = new PolySet(3);
-	ps->setConvexity(this->convexity);
-	bool err = true;
-	std::string errmsg("");
-	CGAL_Polyhedron P;
-	try {
-		// Cast away constness: 
-		// convert_to_Polyhedron() wasn't const in earlier versions of CGAL.
-		CGAL_Nef_polyhedron3 *nonconst_nef3 = const_cast<CGAL_Nef_polyhedron3*>(this->p3.get());
-		err = nefworkaround::convert_to_Polyhedron<CGAL_Kernel3>( *(nonconst_nef3), P );
-		//this->p3->convert_to_Polyhedron(P);
-	}
-	catch (const CGAL::Failure_exception &e) {
-		err = true;
-		errmsg = std::string(e.what());
-	}
-	if (!err) err = CGALUtils::createPolySetFromPolyhedron(P, *ps);
-	if (err) {
-		PRINT("ERROR: CGAL NefPolyhedron->Polyhedron conversion failed.");
-		if (errmsg!="") PRINTB("ERROR: %s",errmsg);
-		delete ps; ps = NULL;
-	}
-	CGALUtils::unlockErrors();
-	return ps;
-}
-#endif
-
 void CGAL_Nef_polyhedron::resize(const Vector3d &newsize, 
-																 const Eigen::Matrix<bool,3,1> &autosize)
+                                 const Eigen::Matrix<bool,3,1> &autosize)
 {
 	// Based on resize() in Giles Bathgate's RapCAD (but not exactly)
 	if (this->isEmpty()) return;
@@ -142,7 +230,6 @@ std::string CGAL_Nef_polyhedron::dump() const
 	return OpenSCAD::dump_svg( *this->p3 );
 }
 
-
 void CGAL_Nef_polyhedron::transform( const Transform3d &matrix )
 {
 	if (!this->isEmpty()) {
@@ -155,7 +242,8 @@ void CGAL_Nef_polyhedron::transform( const Transform3d &matrix )
 				matrix(0,0), matrix(0,1), matrix(0,2), matrix(0,3),
 				matrix(1,0), matrix(1,1), matrix(1,2), matrix(1,3),
 				matrix(2,0), matrix(2,1), matrix(2,2), matrix(2,3), matrix(3,3));
-			this->p3->transform(t);
+			p3->transform(t);
+			data.reset(this);
 		}
 	}
 }

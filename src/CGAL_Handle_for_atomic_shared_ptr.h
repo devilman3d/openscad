@@ -45,8 +45,8 @@
 #include <boost/config.hpp>
 #include <algorithm>
 #include <cstddef>
-#include <atomic>
-#include <memory>
+
+#include "spinlock_pool_multi.h"
 
 #if defined(BOOST_MSVC)
 #  pragma warning(push)
@@ -58,19 +58,12 @@ template <class T>
 class Handle_for
 {
 	std::shared_ptr<T> ptr_;
-	std::atomic_flag flag_;
 
-	struct SpinLock
-	{
-		std::atomic_flag &flag;
-		SpinLock(std::atomic_flag &flag) : flag(flag)
-		{
-			do {} while (flag.test_and_set(std::memory_order_acquire));
-		}
-		~SpinLock()
-		{
-			flag.clear(std::memory_order_release); 
-		}
+	class scoped_lock : public Handle_for_lock_pool::scoped_lock {
+	public:
+		scoped_lock(const std::shared_ptr<T> &p) : Handle_for_lock_pool::scoped_lock(p.get()) { }
+		scoped_lock(const std::shared_ptr<T> &p1, const std::shared_ptr<T> &p2) : 
+			Handle_for_lock_pool::scoped_lock(p1.get(), p2.get()) { }
 	};
 
 public:
@@ -80,22 +73,35 @@ public:
     typedef std::ptrdiff_t Id_type ;
 
     Handle_for()
-		: flag_(ATOMIC_FLAG_INIT)
     {
 		// init a new shared pointer
 		ptr_ = std::make_shared<T>();
     }
 
+	Handle_for(const Handle_for& h)
+	{
+		scoped_lock lock(h.ptr_);
+#ifndef CGAL_HANDLE_FOR_NO_REFCOUNT
+		ptr_ = h.ptr_;
+#else
+		ptr_ = std::make_shared<T>(*h.ptr_);
+#endif
+	}
+
     Handle_for(const element_type& t)
-		: flag_(ATOMIC_FLAG_INIT)
     {
 		// make a shared pointer via t's copy constructor
 		ptr_ = std::make_shared<T>(t);
     }
 
 #ifndef CGAL_CFG_NO_CPP0X_RVALUE_REFERENCE
+	Handle_for(Handle_for && h)
+	{
+		scoped_lock lock(h.ptr_);
+		ptr_ = std::move(h.ptr_);
+	}
+	
     Handle_for(element_type && t)
-		: flag_(ATOMIC_FLAG_INIT)
     {
 		// make a shared pointer via t's copy constructor
 		ptr_ = std::make_shared<T>(std::forward<element_type>(t));
@@ -105,45 +111,39 @@ public:
 #if !defined CGAL_CFG_NO_CPP0X_VARIADIC_TEMPLATES && !defined CGAL_CFG_NO_CPP0X_RVALUE_REFERENCE
 	template < typename T1, typename T2, typename... Args >
 	Handle_for(T1 && t1, T2 && t2, Args && ... args)
-		: flag_(ATOMIC_FLAG_INIT)
 	{
 		ptr_ = std::make_shared<T>(std::forward<T1>(t1), std::forward<T2>(t2), std::forward<Args>(args)...);
 	}
 #else
 	template < typename T1, typename T2 >
 	Handle_for(const T1& t1, const T2& t2)
-		: flag_(ATOMIC_FLAG_INIT)
 	{
 		ptr_ = std::make_shared<T>(t1, t2);
 	}
 
 	template < typename T1, typename T2, typename T3 >
 	Handle_for(const T1& t1, const T2& t2, const T3& t3)
-		: flag_(ATOMIC_FLAG_INIT)
 	{
 		ptr_ = std::make_shared<T>(t1, t2, t3);
 	}
 
 	template < typename T1, typename T2, typename T3, typename T4 >
 	Handle_for(const T1& t1, const T2& t2, const T3& t3, const T4& t4)
-		: flag_(ATOMIC_FLAG_INIT)
 	{
 		ptr_ = std::make_shared<T>(t1, t2, t3, t4);
 	}
 #endif // CGAL_CFG_NO_CPP0X_VARIADIC_TEMPLATES
 
-    Handle_for(const Handle_for& h)
-		: ptr_(h.ptr_)
-		, flag_(ATOMIC_FLAG_INIT)
-    {
-    }
-
     Handle_for&
     operator=(const Handle_for& h)
     {
 		// copy h's shared pointer
-		SpinLock lock(flag_);
+		scoped_lock lock(ptr_, h.ptr_);
+#ifndef CGAL_HANDLE_FOR_NO_REFCOUNT
 		ptr_ = h.ptr_;
+#else
+		ptr_ = std::make_shared<T>(*h.ptr_);
+#endif
         return *this;
     }
 
@@ -151,20 +151,18 @@ public:
     operator=(const element_type &t)
     {
 		// make a shared pointer via t's copy constructor
-		std::shared_ptr<T> tmp = std::make_shared<T>(t);
-		SpinLock lock(flag_);
-		ptr_ = tmp;
+		//std::shared_ptr<T> tmp = std::make_shared<T>(t);
+		scoped_lock lock(ptr_);
+		*ptr_ = t;
         return *this;
     }
 
 #ifndef CGAL_CFG_NO_CPP0X_RVALUE_REFERENCE
-    // Note : I don't see a way to make a useful move constructor, apart
-    //        from e.g. using NULL as a ptr value, but this is drastic.
-
     Handle_for&
     operator=(Handle_for && h)
     {
-		swap(h);
+		scoped_lock lock(ptr_, h.ptr_);
+		ptr_ = std::move(h.ptr_);
         return *this;
     }
 
@@ -172,16 +170,16 @@ public:
     operator=(element_type && t)
     {
 		// make a shared pointer via t's copy constructor
-		std::shared_ptr<T> tmp = std::make_shared<T>(std::forward<element_type>(t));		
-		SpinLock lock(flag_);
-		ptr_ = tmp;
+		//std::shared_ptr<T> tmp = std::make_shared<T>(std::forward<element_type>(t));
+		scoped_lock lock(ptr_);
+		*ptr_ = std::move(t);
         return *this;
     }
 #endif
 
     ~Handle_for()
     {
-		// TODO: does anything need to be done here???
+		ptr_.reset();
     }
 
     Id_type id() const { return Ptr() - static_cast<T const*>(0); }
@@ -199,13 +197,13 @@ public:
     bool
     is_shared() const
     {
-		return ptr_.use_count() > 1;
+		return ptr_.use_count() != 1;
     }
 
     bool
     unique() const
     {
-		return !is_shared();
+		return ptr_.use_count() == 1;
     }
 
     long
@@ -217,8 +215,8 @@ public:
     void
     swap(Handle_for& h)
     {
+		scoped_lock lock(ptr_, h.ptr_);
 		std::shared_ptr<T> tmp = h.ptr_;
-		SpinLock lock(flag_);
 		h.ptr_ = ptr_;
 		ptr_ = tmp;
     }
@@ -228,8 +226,8 @@ protected:
     void
     copy_on_write()
     {
-		SpinLock lock(flag_);
-		if (is_shared()) 
+		scoped_lock lock(ptr_);
+		if (ptr_ && is_shared())
 		{
 			// make a new copy of the data via its copy constructor
 			ptr_ = std::make_shared<T>(*ptr_.get());
@@ -239,12 +237,17 @@ protected:
     // ptr() is the protected access to the pointer.  Both const and non-const.
     // Redundant with Ptr().
     element_type *
-    ptr()
-    { return ptr_.get(); }
+	ptr()
+	{
+		//copy_on_write();
+		return ptr_.get();
+	}
 
     const element_type *
-    ptr() const
-    { return ptr_.get(); }
+	ptr() const
+	{
+		return ptr_.get();
+	}
 };
 
 template <class T>

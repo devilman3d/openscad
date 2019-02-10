@@ -4,10 +4,10 @@
 #include "module.h"
 #include "ModuleInstantiation.h"
 #include "csgnode.h"
+#include "FactoryNode.h"
 #include "transformnode.h"
 #include "colornode.h"
 #include "rendernode.h"
-#include "cgaladvnode.h"
 #include "printutils.h"
 #include "GeometryEvaluator.h"
 #include "polyset.h"
@@ -34,7 +34,8 @@ shared_ptr<CSGNode> CSGTreeEvaluator::buildCSGTree(const AbstractNode &node)
 	
 	shared_ptr<CSGNode> t(this->stored_term[node.index()]);
 	if (t) {
-            if (t->isHighlight()) this->highlightNodes.push_back(t);
+		if (t->isHighlight())
+			this->highlightNodes.push_back(t);
 		if (t->isBackground()) {
 			this->backgroundNodes.push_back(t);
 			t.reset();
@@ -59,14 +60,11 @@ void CSGTreeEvaluator::applyBackgroundAndHighlight(State &state, const AbstractN
 void CSGTreeEvaluator::applyToChildren(State &state, const AbstractNode &node, OpenSCADOperator op)
 {
 	shared_ptr<CSGNode> t1;
-	const ModuleInstantiation *t1_modinst;
 	for(const auto &chnode : this->visitedchildren[node.index()]) {
 		shared_ptr<CSGNode> t2(this->stored_term[chnode->index()]);
-		const ModuleInstantiation *t2_modinst = chnode->modinst;
-		this->stored_term.erase(chnode->index());
+		//this->stored_term.erase(chnode->index());
 		if (t2 && !t1) {
 			t1 = t2;
-			t1_modinst = t2_modinst;
 		} else if (t2 && t1) {
 
 			shared_ptr<CSGNode> t;
@@ -127,19 +125,25 @@ void CSGTreeEvaluator::applyToChildren(State &state, const AbstractNode &node, O
 						t = t1;
 					}
 					break;
+				default:
+					break;
 				}
 			t1 = t;
 		}
 	}
 	if (t1) {
-		if (node.modinst->isBackground()) t1->setBackground(true);
-		if (node.modinst->isHighlight()) t1->setHighlight(true);
+		if (node.isBackground()) t1->setBackground(true);
+		if (node.isHighlight()) t1->setHighlight(true);
 	}
 	this->stored_term[node.index()] = t1;
 }
 
 Response CSGTreeEvaluator::visit(State &state, const AbstractNode &node)
 {
+	if (state.isPrefix()) {
+		this->stored_state[node.index()] = state;
+		return ContinueTraversal;
+	}
 	if (state.isPostfix()) {
 		applyToChildren(state, node, OPENSCAD_UNION);
 		addToParent(state, node);
@@ -149,6 +153,10 @@ Response CSGTreeEvaluator::visit(State &state, const AbstractNode &node)
 
 Response CSGTreeEvaluator::visit(State &state, const AbstractIntersectionNode &node)
 {
+	if (state.isPrefix()) {
+		this->stored_state[node.index()] = state;
+		return ContinueTraversal;
+	}
 	if (state.isPostfix()) {
 		applyToChildren(state, node, OPENSCAD_INTERSECTION);
 		addToParent(state, node);
@@ -157,8 +165,7 @@ Response CSGTreeEvaluator::visit(State &state, const AbstractIntersectionNode &n
 }
 
 shared_ptr<CSGNode> CSGTreeEvaluator::evaluateCSGNodeFromGeometry(
-	State &state, const shared_ptr<const Geometry> &geom,
-	const ModuleInstantiation *modinst, const AbstractNode &node)
+	State &state, const shared_ptr<const Geometry> &geom, const AbstractNode &node)
 {
 	std::stringstream stream;
 	stream << node.name() << node.index();
@@ -166,18 +173,19 @@ shared_ptr<CSGNode> CSGTreeEvaluator::evaluateCSGNodeFromGeometry(
 	// We cannot render Polygon2d directly, so we preprocess (tessellate) it here
 	shared_ptr<const Geometry> g = geom;
 	if (!g->isEmpty()) {
-		shared_ptr<const Polygon2d> p2d = dynamic_pointer_cast<const Polygon2d>(geom);
-		if (p2d) {
+		if (auto p2d = dynamic_pointer_cast<const Polygon2d>(geom)) {
 			g.reset(p2d->tessellate());
 		}
-		else {
+		else if (auto gg = dynamic_pointer_cast<const GeometryGroup>(geom)) {
+			assert(false && "Group???");
+		}
+		else if (auto ps = dynamic_pointer_cast<const PolySet>(geom))
+		{
 			// We cannot render concave polygons, so tessellate any 3D PolySets
-			shared_ptr<const PolySet> ps = dynamic_pointer_cast<const PolySet>(geom);
 			// Since is_convex() doesn't handle non-planar faces, we need to tessellate
 			// also in the indeterminate state so we cannot just use a boolean comparison. See #1061
-			bool convex = ps->convexValue();
-			if (ps && !convex) {
-				assert(ps->getDimension() == 3);
+			assert(ps->getDimension() == 3);
+			if (ps->poly_dim() > 3 && !ps->convexValue()) {
 				PolySet *ps_tri = new PolySet(3, ps->convexValue());
 				ps_tri->setConvexity(ps->getConvexity());
 				PolysetUtils::tessellate_faces(*ps, *ps_tri);
@@ -187,21 +195,27 @@ shared_ptr<CSGNode> CSGTreeEvaluator::evaluateCSGNodeFromGeometry(
 	}
 
 	shared_ptr<CSGNode> t(new CSGLeaf(g, state.matrix(), state.color(), stream.str()));
-	if (modinst->isHighlight()) t->setHighlight(true);
-	else if (modinst->isBackground()) t->setBackground(true);
+	if (node.isHighlight()) 
+		t->setHighlight(true);
+	else if (node.isBackground()) 
+		t->setBackground(true);
 	return t;
 }
 
 Response CSGTreeEvaluator::visit(State &state, const AbstractPolyNode &node)
 {
+	if (state.isPrefix()) {
+		this->stored_state[node.index()] = state;
+		return ContinueTraversal;
+	}
 	if (state.isPostfix()) {
 		shared_ptr<CSGNode> t1;
 		if (this->geomevaluator) {
-			shared_ptr<const Geometry> geom = this->geomevaluator->evaluateGeometry(node, false);
+			shared_ptr<const Geometry> geom = this->geomevaluator->evaluateGeometry(node);
 			if (geom) {
-				t1 = evaluateCSGNodeFromGeometry(state, geom, node.modinst, node);
+				t1 = evaluateCSGNodeFromGeometry(state, geom, node);
 			}
-			node.progress_report();
+			geomevaluator->getProgress().tick();
 		}
 		this->stored_term[node.index()] = t1;
 		addToParent(state, node);
@@ -211,6 +225,10 @@ Response CSGTreeEvaluator::visit(State &state, const AbstractPolyNode &node)
 
 Response CSGTreeEvaluator::visit(State &state, const CsgOpNode &node)
 {
+	if (state.isPrefix()) {
+		this->stored_state[node.index()] = state;
+		return ContinueTraversal;
+	}
 	if (state.isPostfix()) {
 		applyToChildren(state, node, node.type);
 		addToParent(state, node);
@@ -226,6 +244,8 @@ Response CSGTreeEvaluator::visit(State &state, const TransformNode &node)
 			return PruneTraversal;
 		}
 		state.setMatrix(state.matrix() * node.matrix);
+		this->stored_state[node.index()] = state;
+		return ContinueTraversal;
 	}
 	if (state.isPostfix()) {
 		applyToChildren(state, node, OPENSCAD_UNION);
@@ -238,6 +258,8 @@ Response CSGTreeEvaluator::visit(State &state, const ColorNode &node)
 {
 	if (state.isPrefix()) {
 		if (!state.color().isValid()) state.setColor(node.color);
+		this->stored_state[node.index()] = state;
+		return ContinueTraversal;
 	}
 	if (state.isPostfix()) {
 		applyToChildren(state, node, OPENSCAD_UNION);
@@ -246,47 +268,73 @@ Response CSGTreeEvaluator::visit(State &state, const ColorNode &node)
 	return ContinueTraversal;
 }
 
-// FIXME: If we've got CGAL support, render this node as a CGAL union into a PolySet
-Response CSGTreeEvaluator::visit(State &state, const RenderNode &node)
+Response CSGTreeEvaluator::visit(State &state, const BranchNode &node)
 {
-	if (state.isPostfix()) {
-		shared_ptr<CSGNode> t1;
-		shared_ptr<const Geometry> geom;
-		if (this->geomevaluator) {
-			geom = this->geomevaluator->evaluateGeometry(node, false);
-			if (geom) {
-				t1 = evaluateCSGNodeFromGeometry(state, geom, node.modinst, node);
-			}
-			node.progress_report();
-		}
-		this->stored_term[node.index()] = t1;
-		addToParent(state, node);
+	if (state.isPrefix()) {
+		this->stored_state[node.index()] = state;
+		return ContinueTraversal;
 	}
-	return ContinueTraversal;
-}
-
-Response CSGTreeEvaluator::visit(State &state, const CgaladvNode &node)
-{
 	if (state.isPostfix()) {
-		shared_ptr<CSGNode> t1;
-    // FIXME: Calling evaluator directly since we're not a PolyNode. Generalize this.
-		shared_ptr<const Geometry> geom;
 		if (this->geomevaluator) {
-			geom = this->geomevaluator->evaluateGeometry(node, false);
+			shared_ptr<const Geometry> geom = this->geomevaluator->evaluateGeometry(node);
 			if (geom) {
-				t1 = evaluateCSGNodeFromGeometry(state, geom, node.modinst, node);
+				if (auto gg = dynamic_pointer_cast<const GeometryGroup>(geom)) {
+					for (auto &gi : gg->getChildren()) {
+						const auto &childNode = *gi.first;
+						auto childGeom = gi.second;
+						auto &childState = stored_state[childNode.index()];
+						auto term = this->stored_term[childNode.index()];
+						if (auto leaf = dynamic_pointer_cast<CSGLeaf>(term)) {
+							PRINTB("CSG: processor leaf: %s", leaf->dump());
+							leaf->geom = childGeom;
+							leaf->matrix = state.matrix();
+							addToParent(state, childNode);
+						}
+						else if (term) {
+							PRINTB("CSG: processor term: %s", term->dump());
+							addToParent(state, childNode);
+						}
+						else {
+							PRINTB("CSG: processor MISSING: %d", childNode.index());
+							childState.setPostfix(true);
+							if (childNode.accept(childState, *this) == AbortTraversal) {
+								return AbortTraversal;
+							}
+							term = this->stored_term[childNode.index()];
+							if (auto leaf = dynamic_pointer_cast<CSGLeaf>(term)) {
+								PRINTB("....CSG: processor leaf: %s", leaf->dump());
+								leaf->geom = childGeom;
+								leaf->matrix = state.matrix();
+								addToParent(state, childNode);
+							}
+							else if (term) {
+								PRINTB("....CSG: processor term: %s", term->dump());
+								addToParent(state, childNode);
+							}
+							else {
+								PRINTB("....CSG: processor MISSING: %d", childNode.index());
+							}
+						}
+						//applyBackgroundAndHighlight(state, *gi.first);
+					}
+					//applyToChildren(state, node, OPENSCAD_UNION);
+					//addToParent(state, node);
+				}
+				else {
+					auto t1 = evaluateCSGNodeFromGeometry(state, geom, node);
+					this->stored_term[node.index()] = t1;
+					applyBackgroundAndHighlight(state, node);
+					addToParent(state, node);
+				}
 			}
-			node.progress_report();
+			geomevaluator->getProgress().tick();
 		}
-		this->stored_term[node.index()] = t1;
-		applyBackgroundAndHighlight(state, node);
-		addToParent(state, node);
 	}
 	return ContinueTraversal;
 }
 
 /*!
-	Adds ourself to out parent's list of traversed children.
+	Adds node to the parent state's list of traversed children.
 	Call this for _every_ node which affects output during traversal.
     Usually, this should be called from the postfix stage, but for some nodes, we defer traversal letting other components (e.g. CGAL) render the subgraph, and we'll then call this from prefix and prune further traversal.
 */

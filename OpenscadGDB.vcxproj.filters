@@ -1,0 +1,982 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source">
+      <UniqueIdentifier>{4a1c5d72-f16b-4978-baab-b06ece9ce410}</UniqueIdentifier>
+      <Extensions>.cc</Extensions>
+    </Filter>
+    <Filter Include="Headers">
+      <UniqueIdentifier>{e3047e34-cfb6-4828-ab3e-6ca2d5449f6f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Parser">
+      <UniqueIdentifier>{d53fd422-6214-4b32-ac77-e8eabe54fcc3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Makefiles">
+      <UniqueIdentifier>{c5cfecd5-720e-4be3-8974-77d1da7d4433}</UniqueIdentifier>
+      <Extensions>makefile*.*</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\annotation.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\assignment.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AST.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\AutoUpdater.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\boost-utils.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\builtin.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\calc.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Camera.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CGAL_Nef_polyhedron.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cgaladv.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CGALCache.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CGALRenderer.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cgalutils.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cgalutils-applyops.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cgalutils-polyhedron.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cgalutils-project.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cgalutils-tess.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cgalutils-tess-old.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\cgalworker.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\polyclipping\clipper.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\clipper-utils.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\color.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\colormap.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\comment.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\context.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\control.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\csgnode.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\csgops.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CSGTreeEvaluator.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CSGTreeNormalizer.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Dock.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\DrawingCallback.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dxfdata.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dxfdim.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\editor.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\evalcontext.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\export.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\export_amf.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\export_dxf.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\export_nef.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\export_off.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\export_png.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\export_stl.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\export_svg.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\expr.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\fbo.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\feature.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\FileModule.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\fileutils.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\FontCache.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\FontListDialog.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\FontListTableView.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\FreetypeRenderer.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\func.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\function.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Geometry.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\GeometryCache.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\GeometryEvaluator.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\GeometryUtils.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\GLView.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\grid.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\GroupModule.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\handle_dep.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\hash.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\highlighter.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\imageutils.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\imageutils-lodepng.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\imageutils-macosx.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\import.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\import_amf.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\import_nef.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\import_off.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\import_stl.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\import_svg.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\launchingscreen.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\legacyeditor.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\LibraryInfo.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\LibraryInfoDialog.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\linalg.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\linearextrude.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\localscope.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lodepng.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modcontext.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\module.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ModuleCache.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ModuleInstantiation.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\namedcolors.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\node.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\nodedumper.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\NodeVisitor.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\NULLGL.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\OffscreenContextGLX.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\OffscreenContextNULL.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\OffscreenContextWGL.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\OffscreenView.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\offset.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\OpenCSGRenderer.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\OpenCSGWarningDialog.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\openscad.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\OpenSCADApp.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\parsersettings.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\PlatformUtils.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\PlatformUtils-posix.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\PlatformUtils-win.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Polygon2d.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Polygon2d-CGAL.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\polyset.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\polyset-gl.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\polyset-utils.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\polyset-utils-old.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Preferences.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\primitives.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\printutils.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\progress.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ProgressWidget.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\projection.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\QGLView.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\QWordSearchField.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\render.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\renderer.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rendersettings.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\rotateextrude.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\scadlexer.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\scintillaeditor.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\settings.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\stackcheck.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\StatCache.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\stl-utils.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\surface.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\svg.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\system-gl.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\text.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ThreadedNodeVisitor.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ThrownTogetherRenderer.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\transform.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Tree.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UIUtils.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UserModule.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\value.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\version_check.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\WindowManager.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\IScope.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\mainwin.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\PolyMesh.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\import_obj.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\FactoryModule.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="src\FactoryNode.cc">
+      <Filter>Source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\AboutDialog.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\annotation.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AppleEvents.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Assignment.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AST.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\AutoUpdater.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\BaseVisitable.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\boost-utils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\boosty.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\builtin.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cache.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\calc.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Camera.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cgal.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CGAL_Nef_polyhedron.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CGAL_Nef3_workaround.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CGAL_OGL_Polyhedron.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CGAL_workaround_Mark_bounded_volumes.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cgaladvnode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CGALCache.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cgalfwd.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CGALRenderer.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cgalutils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\cgalworker.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\polyclipping\clipper.hpp">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\clipper-utils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CocoaUtils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\colormap.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\comment.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\colornode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\context.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\convex_hull_3_bugfix.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CsgInfo.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\csgnode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\csgops.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CSGTreeEvaluator.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CSGTreeNormalizer.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Dock.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\DrawingCallback.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dxfdata.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dxfdim.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\enums.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\evalcontext.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\EventFilter.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\exceptions.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\export.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\expression.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\fbo.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\feature.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FileModule.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\fileutils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\findversion.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FontCache.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FontListDialog.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FontListTableView.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FreetypeRenderer.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\function.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Geometry.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\GeometryCache.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\GeometryEvaluator.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\GroupModule.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\GeometryUtils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\GLView.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\grid.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\handle_dep.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\hash.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\highlighter.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\imageutils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\import.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\importnode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\launchingscreen.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\legacyeditor.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\LibraryInfo.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\LibraryInfoDialog.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\linalg.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\linearextrudenode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\localscope.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lodepng.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\MainWindow.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\memory.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modcontext.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\module.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ModuleCache.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ModuleInstantiation.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\node.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\nodecache.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\nodedumper.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\NodeVisitor.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\OffscreenContext.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\OffscreenContextAll.hpp">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\OffscreenView.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\offsetnode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\OGL_helper.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\OpenCSGRenderer.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\OpenCSGWarningDialog.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\openscad.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\OpenSCADApp.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Package.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\parsersettings.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\PlatformUtils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Polygon2d.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Polygon2d-CGAL.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\polyset.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\polyset-utils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Preferences.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\printutils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\progress.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ProgressWidget.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\projectionnode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\QGLView.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\qtgettext.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\QWordSearchField.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Reindexer.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\renderer.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rendernode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rendersettings.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\rotateextrudenode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\scadlexer.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\scintillaeditor.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\settings.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\SparkleAutoUpdater.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stackcheck.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\StatCache.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\state.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stl-utils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\svg.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\system-gl.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\textnode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ThreadedNodeVisitor.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ThrownTogetherRenderer.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Tree.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UIUtils.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UserModule.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\value.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\version_check.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\WindowManager.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CGAL_Handle_for_atomic_shared_ptr.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CGAL_Handle_for_atomic_uint.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\transformnode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\PathHelpers.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Gmpqx_type.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\spinlock_pool_multi.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Gmpzfx_type.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Gmpzx_type.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Gmpfrx_type.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Profile_counterx.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Tags.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\StdAfx.hpp">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\IScope.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\TypeInstance.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\LookupResult.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FactoryModule.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\PolyMesh.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\expressions.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\maybe_const.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Handles.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="src\FactoryNode.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\AboutDialog.html">
+      <Filter>Source</Filter>
+    </None>
+    <None Include="src\lexer.l">
+      <Filter>Parser</Filter>
+    </None>
+    <None Include="src\parser.y">
+      <Filter>Parser</Filter>
+    </None>
+    <None Include="Makefile.Debug">
+      <Filter>Makefiles</Filter>
+    </None>
+    <None Include="Makefile.Release">
+      <Filter>Makefiles</Filter>
+    </None>
+    <None Include="build.sh">
+      <Filter>Makefiles</Filter>
+    </None>
+    <None Include="openscad.pro">
+      <Filter>Makefiles</Filter>
+    </None>
+    <None Include="OpenSCAD.props">
+      <Filter>Makefiles</Filter>
+    </None>
+    <None Include="WSL_sense.props">
+      <Filter>Makefiles</Filter>
+    </None>
+    <None Include="version.pri">
+      <Filter>Makefiles</Filter>
+    </None>
+    <None Include="src\comment_lexer.l">
+      <Filter>Parser</Filter>
+    </None>
+    <None Include="src\comment_parser.y">
+      <Filter>Parser</Filter>
+    </None>
+    <None Include="cpp.hint">
+      <Filter>Makefiles</Filter>
+    </None>
+    <None Include="src\parameter\parameter.pro">
+      <Filter>Makefiles</Filter>
+    </None>
+  </ItemGroup>
+</Project>

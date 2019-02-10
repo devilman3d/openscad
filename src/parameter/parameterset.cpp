@@ -2,6 +2,7 @@
 #include "comment.h"
 #include "modcontext.h"
 #include "expression.h"
+#include "expressions.h"
 #include "printutils.h"
 #include <fstream>
 #include <boost/property_tree/json_parser.hpp>
@@ -93,7 +94,7 @@ void ParameterSet::applyParameterSet(FileModule *fileModule, const std::string &
 	try {
 		ModuleContext ctx;
 		boost::optional<pt::ptree &> set = getParameterSet(setName);
-		for (auto &assignment : fileModule->scope.assignments) {
+		for (auto &assignment : fileModule->getParameters()) {
 			for (auto &v : set.get()) {
 				if (v.first == assignment.name) {
 					const ValuePtr defaultValue = assignment.expr->evaluate(&ctx);

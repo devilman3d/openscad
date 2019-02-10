@@ -1,0 +1,483 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|ARM">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM">
+      <Configuration>Release</Configuration>
+      <Platform>ARM</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x86">
+      <Configuration>Debug</Configuration>
+      <Platform>x86</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x86">
+      <Configuration>Release</Configuration>
+      <Platform>x86</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{d97ca3a8-8747-452f-a5e9-cdbfd1272fe3}</ProjectGuid>
+    <Keyword>Linux</Keyword>
+    <RootNamespace>OpenscadGDB</RootNamespace>
+    <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
+    <ApplicationType>Linux</ApplicationType>
+    <ApplicationTypeRevision>1.0</ApplicationTypeRevision>
+    <TargetLinuxPlatform>Generic</TargetLinuxPlatform>
+    <LinuxProjectType>{2238F9CD-F817-4ECC-BD14-2524D2669B35}</LinuxProjectType>
+    <ProjectName>openscad</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <ConfigurationType>Makefile</ConfigurationType>
+    <RemoteRootDir>/home/devon/openscad/</RemoteRootDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <ConfigurationType>Makefile</ConfigurationType>
+    <RemoteRootDir>/home/devon/openscad/</RemoteRootDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="WSL_sense.props" />
+    <Import Project="OpenSCAD.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
+    <Import Project="WSL_sense.props" />
+    <Import Project="OpenSCAD.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="WSL_sense.props" />
+    <Import Project="OpenSCAD.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
+    <Import Project="WSL_sense.props" />
+    <Import Project="OpenSCAD.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
+    <Import Project="WSL_sense.props" />
+    <Import Project="OpenSCAD.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+    <Import Project="WSL_sense.props" />
+    <Import Project="OpenSCAD.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LocalRemoteCopySources>true</LocalRemoteCopySources>
+    <RemoteBuildCommandLine>./build.sh $(Configuration)</RemoteBuildCommandLine>
+    <RemoteCleanCommandLine>./build.sh $(Configuration) Clean</RemoteCleanCommandLine>
+    <RemoteBuildOutputs>
+    </RemoteBuildOutputs>
+    <AdditionalOptions>
+    </AdditionalOptions>
+    <NMakePreprocessorDefinitions>DEBUG=1;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <RemoteProjectDir>/home/devon/openscad/</RemoteProjectDir>
+    <NMakeForcedIncludes>
+    </NMakeForcedIncludes>
+    <SourcesToCopyRemotelyOverride />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LocalRemoteCopySources>true</LocalRemoteCopySources>
+    <RemoteBuildCommandLine>./build.sh $(Configuration)</RemoteBuildCommandLine>
+    <RemoteCleanCommandLine>./build.sh $(Configuration) Clean</RemoteCleanCommandLine>
+    <RemoteBuildOutputs>
+    </RemoteBuildOutputs>
+    <NMakePreprocessorDefinitions>ENABLE_CGAL;__GLIBCXX__;__cplusplus=201103L;__GMP_DECLSPEC=;NDEBUG;QT_STATIC;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <AdditionalOptions>
+    </AdditionalOptions>
+    <RemoteProjectDir>/home/devon/openscad/</RemoteProjectDir>
+    <NMakeIncludeSearchPath>$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
+    <SourcesToCopyRemotelyOverride />
+    <TargetName>openscad</TargetName>
+    <TargetExt />
+  </PropertyGroup>
+  <ItemGroup>
+    <ClCompile Include="src\annotation.cc" />
+    <ClCompile Include="src\assignment.cc" />
+    <ClCompile Include="src\AST.cc" />
+    <ClCompile Include="src\AutoUpdater.cc" />
+    <ClCompile Include="src\boost-utils.cc" />
+    <ClCompile Include="src\builtin.cc" />
+    <ClCompile Include="src\calc.cc" />
+    <ClCompile Include="src\Camera.cc" />
+    <ClCompile Include="src\cgaladv.cc" />
+    <ClCompile Include="src\CGALCache.cc" />
+    <ClCompile Include="src\CGALRenderer.cc" />
+    <ClCompile Include="src\cgalutils-applyops.cc" />
+    <ClCompile Include="src\cgalutils-polyhedron.cc" />
+    <ClCompile Include="src\cgalutils-project.cc" />
+    <ClCompile Include="src\cgalutils-tess-old.cc" />
+    <ClCompile Include="src\cgalutils-tess.cc" />
+    <ClCompile Include="src\cgalutils.cc" />
+    <ClCompile Include="src\cgalworker.cc" />
+    <ClCompile Include="src\CGAL_Nef_polyhedron.cc" />
+    <ClCompile Include="src\clipper-utils.cc" />
+    <ClCompile Include="src\color.cc" />
+    <ClCompile Include="src\colormap.cc" />
+    <ClCompile Include="src\comment.cpp" />
+    <ClCompile Include="src\context.cc" />
+    <ClCompile Include="src\control.cc" />
+    <ClCompile Include="src\csgnode.cc" />
+    <ClCompile Include="src\csgops.cc" />
+    <ClCompile Include="src\CSGTreeEvaluator.cc" />
+    <ClCompile Include="src\CSGTreeNormalizer.cc" />
+    <ClCompile Include="src\Dock.cc" />
+    <ClCompile Include="src\DrawingCallback.cc" />
+    <ClCompile Include="src\dxfdata.cc" />
+    <ClCompile Include="src\dxfdim.cc" />
+    <ClCompile Include="src\editor.cc" />
+    <ClCompile Include="src\evalcontext.cc" />
+    <ClCompile Include="src\export.cc" />
+    <ClCompile Include="src\export_amf.cc" />
+    <ClCompile Include="src\export_dxf.cc" />
+    <ClCompile Include="src\export_nef.cc" />
+    <ClCompile Include="src\export_off.cc" />
+    <ClCompile Include="src\export_png.cc" />
+    <ClCompile Include="src\export_stl.cc" />
+    <ClCompile Include="src\export_svg.cc" />
+    <ClCompile Include="src\expr.cc" />
+    <ClCompile Include="src\FactoryModule.cc" />
+    <ClCompile Include="src\fbo.cc" />
+    <ClCompile Include="src\feature.cc" />
+    <ClCompile Include="src\FileModule.cc" />
+    <ClCompile Include="src\fileutils.cc" />
+    <ClCompile Include="src\FontCache.cc" />
+    <ClCompile Include="src\FontListDialog.cc" />
+    <ClCompile Include="src\FontListTableView.cc" />
+    <ClCompile Include="src\FreetypeRenderer.cc" />
+    <ClCompile Include="src\func.cc" />
+    <ClCompile Include="src\function.cc" />
+    <ClCompile Include="src\Geometry.cc" />
+    <ClCompile Include="src\GeometryCache.cc" />
+    <ClCompile Include="src\GeometryEvaluator.cc" />
+    <ClCompile Include="src\GeometryUtils.cc" />
+    <ClCompile Include="src\GLView.cc" />
+    <ClCompile Include="src\grid.cc" />
+    <ClCompile Include="src\GroupModule.cc" />
+    <ClCompile Include="src\handle_dep.cc" />
+    <ClCompile Include="src\hash.cc" />
+    <ClCompile Include="src\highlighter.cc" />
+    <ClCompile Include="src\imageutils-lodepng.cc" />
+    <ClCompile Include="src\imageutils-macosx.cc" />
+    <ClCompile Include="src\imageutils.cc" />
+    <ClCompile Include="src\import.cc" />
+    <ClCompile Include="src\import_amf.cc" />
+    <ClCompile Include="src\import_nef.cc" />
+    <ClCompile Include="src\import_obj.cc" />
+    <ClCompile Include="src\import_off.cc" />
+    <ClCompile Include="src\import_stl.cc" />
+    <ClCompile Include="src\import_svg.cc" />
+    <ClCompile Include="src\IScope.cpp" />
+    <ClCompile Include="src\launchingscreen.cc" />
+    <ClCompile Include="src\legacyeditor.cc" />
+    <ClCompile Include="src\LibraryInfo.cc" />
+    <ClCompile Include="src\LibraryInfoDialog.cc" />
+    <ClCompile Include="src\linalg.cc" />
+    <ClCompile Include="src\linearextrude.cc" />
+    <ClCompile Include="src\localscope.cc" />
+    <ClCompile Include="src\lodepng.cpp" />
+    <ClCompile Include="src\mainwin.cc" />
+    <ClCompile Include="src\modcontext.cc" />
+    <ClCompile Include="src\module.cc" />
+    <ClCompile Include="src\ModuleCache.cc" />
+    <ClCompile Include="src\ModuleInstantiation.cc" />
+    <ClCompile Include="src\namedcolors.cpp" />
+    <ClCompile Include="src\node.cc" />
+    <ClCompile Include="src\nodedumper.cc" />
+    <ClCompile Include="src\NodeVisitor.cc" />
+    <ClCompile Include="src\NULLGL.cc" />
+    <ClCompile Include="src\OffscreenContextGLX.cc" />
+    <ClCompile Include="src\OffscreenContextNULL.cc" />
+    <ClCompile Include="src\OffscreenContextWGL.cc" />
+    <ClCompile Include="src\OffscreenView.cc" />
+    <ClCompile Include="src\offset.cc" />
+    <ClCompile Include="src\OpenCSGRenderer.cc" />
+    <ClCompile Include="src\OpenCSGWarningDialog.cc" />
+    <ClCompile Include="src\openscad.cc" />
+    <ClCompile Include="src\OpenSCADApp.cc" />
+    <ClCompile Include="src\parsersettings.cc" />
+    <ClCompile Include="src\PlatformUtils-posix.cc" />
+    <ClCompile Include="src\PlatformUtils-win.cc" />
+    <ClCompile Include="src\PlatformUtils.cc" />
+    <ClCompile Include="src\polyclipping\clipper.cpp" />
+    <ClCompile Include="src\Polygon2d-CGAL.cc" />
+    <ClCompile Include="src\Polygon2d.cc" />
+    <ClCompile Include="src\PolyMesh.cc" />
+    <ClCompile Include="src\polyset-gl.cc" />
+    <ClCompile Include="src\polyset-utils-old.cc" />
+    <ClCompile Include="src\polyset-utils.cc" />
+    <ClCompile Include="src\polyset.cc" />
+    <ClCompile Include="src\Preferences.cc" />
+    <ClCompile Include="src\primitives.cc" />
+    <ClCompile Include="src\printutils.cc" />
+    <ClCompile Include="src\FactoryNode.cc" />
+    <ClCompile Include="src\progress.cc" />
+    <ClCompile Include="src\ProgressWidget.cc" />
+    <ClCompile Include="src\projection.cc" />
+    <ClCompile Include="src\QGLView.cc" />
+    <ClCompile Include="src\QWordSearchField.cc" />
+    <ClCompile Include="src\render.cc" />
+    <ClCompile Include="src\renderer.cc" />
+    <ClCompile Include="src\rendersettings.cc" />
+    <ClCompile Include="src\rotateextrude.cc" />
+    <ClCompile Include="src\scadlexer.cpp" />
+    <ClCompile Include="src\scintillaeditor.cpp" />
+    <ClCompile Include="src\settings.cc" />
+    <ClCompile Include="src\stackcheck.cc" />
+    <ClCompile Include="src\StatCache.cc" />
+    <ClCompile Include="src\stl-utils.cc" />
+    <ClCompile Include="src\surface.cc" />
+    <ClCompile Include="src\svg.cc" />
+    <ClCompile Include="src\system-gl.cc" />
+    <ClCompile Include="src\text.cc" />
+    <ClCompile Include="src\ThreadedNodeVisitor.cc" />
+    <ClCompile Include="src\ThrownTogetherRenderer.cc" />
+    <ClCompile Include="src\transform.cc" />
+    <ClCompile Include="src\Tree.cc" />
+    <ClCompile Include="src\UIUtils.cc" />
+    <ClCompile Include="src\UserModule.cc" />
+    <ClCompile Include="src\value.cc" />
+    <ClCompile Include="src\version_check.cc" />
+    <ClCompile Include="src\WindowManager.cc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\AboutDialog.h" />
+    <ClInclude Include="src\annotation.h" />
+    <ClInclude Include="src\AppleEvents.h" />
+    <ClInclude Include="src\Assignment.h" />
+    <ClInclude Include="src\AST.h" />
+    <ClInclude Include="src\AutoUpdater.h" />
+    <ClInclude Include="src\BaseVisitable.h" />
+    <ClInclude Include="src\boost-utils.h" />
+    <ClInclude Include="src\boosty.h" />
+    <ClInclude Include="src\builtin.h" />
+    <ClInclude Include="src\cache.h" />
+    <ClInclude Include="src\calc.h" />
+    <ClInclude Include="src\Camera.h" />
+    <ClInclude Include="src\cgal.h" />
+    <ClInclude Include="src\cgaladvnode.h" />
+    <ClInclude Include="src\CGALCache.h" />
+    <ClInclude Include="src\cgalfwd.h" />
+    <ClInclude Include="src\CGALRenderer.h" />
+    <ClInclude Include="src\cgalutils.h" />
+    <ClInclude Include="src\cgalworker.h" />
+    <ClInclude Include="src\CGAL_Handle_for_atomic_shared_ptr.h" />
+    <ClInclude Include="src\CGAL_Handle_for_atomic_uint.h" />
+    <ClInclude Include="src\CGAL_Nef3_workaround.h" />
+    <ClInclude Include="src\CGAL_Nef_polyhedron.h" />
+    <ClInclude Include="src\CGAL_OGL_Polyhedron.h" />
+    <ClInclude Include="src\CGAL_workaround_Mark_bounded_volumes.h" />
+    <ClInclude Include="src\clipper-utils.h" />
+    <ClInclude Include="src\CocoaUtils.h" />
+    <ClInclude Include="src\colormap.h" />
+    <ClInclude Include="src\colornode.h" />
+    <ClInclude Include="src\comment.h" />
+    <ClInclude Include="src\context.h" />
+    <ClInclude Include="src\convex_hull_3_bugfix.h" />
+    <ClInclude Include="src\CsgInfo.h" />
+    <ClInclude Include="src\csgnode.h" />
+    <ClInclude Include="src\csgops.h" />
+    <ClInclude Include="src\CSGTreeEvaluator.h" />
+    <ClInclude Include="src\CSGTreeNormalizer.h" />
+    <ClInclude Include="src\Dock.h" />
+    <ClInclude Include="src\DrawingCallback.h" />
+    <ClInclude Include="src\dxfdata.h" />
+    <ClInclude Include="src\dxfdim.h" />
+    <ClInclude Include="src\editor.h" />
+    <ClInclude Include="src\enums.h" />
+    <ClInclude Include="src\evalcontext.h" />
+    <ClInclude Include="src\EventFilter.h" />
+    <ClInclude Include="src\exceptions.h" />
+    <ClInclude Include="src\export.h" />
+    <ClInclude Include="src\expression.h" />
+    <ClInclude Include="src\expressions.h" />
+    <ClInclude Include="src\FactoryModule.h" />
+    <ClInclude Include="src\fbo.h" />
+    <ClInclude Include="src\feature.h" />
+    <ClInclude Include="src\FileModule.h" />
+    <ClInclude Include="src\fileutils.h" />
+    <ClInclude Include="src\findversion.h" />
+    <ClInclude Include="src\FontCache.h" />
+    <ClInclude Include="src\FontListDialog.h" />
+    <ClInclude Include="src\FontListTableView.h" />
+    <ClInclude Include="src\FreetypeRenderer.h" />
+    <ClInclude Include="src\function.h" />
+    <ClInclude Include="src\Geometry.h" />
+    <ClInclude Include="src\GeometryCache.h" />
+    <ClInclude Include="src\GeometryEvaluator.h" />
+    <ClInclude Include="src\GeometryUtils.h" />
+    <ClInclude Include="src\GLView.h" />
+    <ClInclude Include="src\Gmpfrx_type.h" />
+    <ClInclude Include="src\Gmpqx_type.h" />
+    <ClInclude Include="src\Gmpzfx_type.h" />
+    <ClInclude Include="src\Gmpzx_type.h" />
+    <ClInclude Include="src\grid.h" />
+    <ClInclude Include="src\GroupModule.h" />
+    <ClInclude Include="src\Handles.h" />
+    <ClInclude Include="src\handle_dep.h" />
+    <ClInclude Include="src\hash.h" />
+    <ClInclude Include="src\highlighter.h" />
+    <ClInclude Include="src\imageutils.h" />
+    <ClInclude Include="src\import.h" />
+    <ClInclude Include="src\importnode.h" />
+    <ClInclude Include="src\IScope.h" />
+    <ClInclude Include="src\launchingscreen.h" />
+    <ClInclude Include="src\legacyeditor.h" />
+    <ClInclude Include="src\LibraryInfo.h" />
+    <ClInclude Include="src\LibraryInfoDialog.h" />
+    <ClInclude Include="src\linalg.h" />
+    <ClInclude Include="src\linearextrudenode.h" />
+    <ClInclude Include="src\localscope.h" />
+    <ClInclude Include="src\lodepng.h" />
+    <ClInclude Include="src\LookupResult.h" />
+    <ClInclude Include="src\MainWindow.h" />
+    <ClInclude Include="src\maybe_const.h" />
+    <ClInclude Include="src\memory.h" />
+    <ClInclude Include="src\modcontext.h" />
+    <ClInclude Include="src\module.h" />
+    <ClInclude Include="src\ModuleCache.h" />
+    <ClInclude Include="src\ModuleInstantiation.h" />
+    <ClInclude Include="src\node.h" />
+    <ClInclude Include="src\nodecache.h" />
+    <ClInclude Include="src\nodedumper.h" />
+    <ClInclude Include="src\NodeVisitor.h" />
+    <ClInclude Include="src\OffscreenContext.h" />
+    <ClInclude Include="src\OffscreenContextAll.hpp" />
+    <ClInclude Include="src\OffscreenView.h" />
+    <ClInclude Include="src\offsetnode.h" />
+    <ClInclude Include="src\OGL_helper.h" />
+    <ClInclude Include="src\OpenCSGRenderer.h" />
+    <ClInclude Include="src\OpenCSGWarningDialog.h" />
+    <ClInclude Include="src\openscad.h" />
+    <ClInclude Include="src\OpenSCADApp.h" />
+    <ClInclude Include="src\Package.h" />
+    <ClInclude Include="src\parsersettings.h" />
+    <ClInclude Include="src\PathHelpers.h" />
+    <ClInclude Include="src\PlatformUtils.h" />
+    <ClInclude Include="src\polyclipping\clipper.hpp" />
+    <ClInclude Include="src\Polygon2d-CGAL.h" />
+    <ClInclude Include="src\Polygon2d.h" />
+    <ClInclude Include="src\PolyMesh.h" />
+    <ClInclude Include="src\polyset-utils.h" />
+    <ClInclude Include="src\polyset.h" />
+    <ClInclude Include="src\Preferences.h" />
+    <ClInclude Include="src\printutils.h" />
+    <ClInclude Include="src\FactoryNode.h" />
+    <ClInclude Include="src\Profile_counterx.h" />
+    <ClInclude Include="src\progress.h" />
+    <ClInclude Include="src\ProgressWidget.h" />
+    <ClInclude Include="src\projectionnode.h" />
+    <ClInclude Include="src\QGLView.h" />
+    <ClInclude Include="src\qtgettext.h" />
+    <ClInclude Include="src\QWordSearchField.h" />
+    <ClInclude Include="src\Reindexer.h" />
+    <ClInclude Include="src\renderer.h" />
+    <ClInclude Include="src\rendernode.h" />
+    <ClInclude Include="src\rendersettings.h" />
+    <ClInclude Include="src\rotateextrudenode.h" />
+    <ClInclude Include="src\scadlexer.h" />
+    <ClInclude Include="src\scintillaeditor.h" />
+    <ClInclude Include="src\settings.h" />
+    <ClInclude Include="src\SparkleAutoUpdater.h" />
+    <ClInclude Include="src\spinlock_pool_multi.h" />
+    <ClInclude Include="src\stackcheck.h" />
+    <ClInclude Include="src\StatCache.h" />
+    <ClInclude Include="src\state.h" />
+    <ClInclude Include="src\StdAfx.hpp" />
+    <ClInclude Include="src\stl-utils.h" />
+    <ClInclude Include="src\svg.h" />
+    <ClInclude Include="src\system-gl.h" />
+    <ClInclude Include="src\Tags.h" />
+    <ClInclude Include="src\textnode.h" />
+    <ClInclude Include="src\ThreadedNodeVisitor.h" />
+    <ClInclude Include="src\ThrownTogetherRenderer.h" />
+    <ClInclude Include="src\transformnode.h" />
+    <ClInclude Include="src\Tree.h" />
+    <ClInclude Include="src\TypeInstance.h" />
+    <ClInclude Include="src\UIUtils.h" />
+    <ClInclude Include="src\UserModule.h" />
+    <ClInclude Include="src\value.h" />
+    <ClInclude Include="src\version_check.h" />
+    <ClInclude Include="src\WindowManager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="build.sh" />
+    <None Include="cpp.hint" />
+    <None Include="Makefile.Debug" />
+    <None Include="Makefile.Release" />
+    <None Include="openscad.pro" />
+    <None Include="OpenSCAD.props">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="src\AboutDialog.html" />
+    <None Include="src\comment_lexer.l" />
+    <None Include="src\comment_parser.y" />
+    <None Include="src\lexer.l" />
+    <None Include="src\parameter\parameter.pro" />
+    <None Include="src\parser.y" />
+    <None Include="version.pri" />
+    <None Include="WSL_sense.props">
+      <SubType>Designer</SubType>
+    </None>
+  </ItemGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <RemotePreBuildEvent>
+      <Command>echo hi from prebuild in $PWD</Command>
+    </RemotePreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <RemotePreBuildEvent>
+      <Message>stupid prebuild</Message>
+    </RemotePreBuildEvent>
+    <RemotePostBuildEvent>
+      <Command>
+      </Command>
+      <Message>Checking build result</Message>
+    </RemotePostBuildEvent>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PostBuildEvent>
+      <Message>Checking build.errors</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <RemotePreBuildEvent />
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <RemotePreBuildEvent />
+    <RemotePostBuildEvent>
+      <Command>
+      </Command>
+    </RemotePostBuildEvent>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>

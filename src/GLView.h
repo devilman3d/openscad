@@ -17,13 +17,26 @@ Some actions (showCrossHairs) only work properly on Gimbal Camera.
 
 */
 
-#include <Eigen/Core>
-#include <Eigen/Geometry>
-#include <string>
-#include "system-gl.h"
-#include <iostream>
+#include "linalg.h"
 #include "Camera.h"
 #include "colormap.h"
+#include <string>
+
+struct Light
+{
+	bool enabled;
+	bool fixedPos;
+	bool fixedRot;
+	Vector4d vec;
+	Color4f color;
+
+	Light() : enabled(false), fixedPos(false), fixedRot(false) { }
+	Light(bool enabled, bool fixedPos, bool fixedRot, Vector4d vec, Color4f color) 
+		: enabled(enabled), fixedPos(fixedPos), fixedRot(fixedRot), vec(vec), color(color) { }
+
+	void setValue(const class ValuePtr &v);
+	ValuePtr getValue() const;
+};
 
 class GLView
 {
@@ -36,14 +49,23 @@ public:
 	void resizeGL(int w, int h);
 	virtual void paintGL();
 
-	void setCamera(const Camera &cam);
-	void setupCamera();
+	// camera
+	void setCamera(const class Camera &cam);
 
+	// Lighting
+	void setupDefaultLighting();
+	class ValuePtr getLightValues() const;
+	void setLightValues(const ValuePtr &v);
+
+	// Color Scheme
 	void setColorScheme(const ColorScheme &cs);
 	void setColorScheme(const std::string &cs);
 	void updateColorScheme();
 
+	// Save image
 	virtual bool save(const char *filename) = 0;
+
+	// Info
 	virtual std::string getRendererInfo() const = 0;
 	virtual float getDPI() { return 1.0f; }
 
@@ -62,18 +84,22 @@ public:
 	bool showscale;
 
 #ifdef ENABLE_OPENCSG
-	GLint shaderinfo[11];
 	bool is_opencsg_capable;
-	bool has_shaders;
-	void enable_opencsg_shaders();
 	virtual void display_opencsg_warning() = 0;
 	bool opencsg_support;
 	int opencsg_id;
 #endif
-private:
+protected:
 	void showCrosshairs();
 	void showAxes(const Color4f &col);
 	void showSmallaxes(const Color4f &col);
 	void showScalemarkers(const Color4f &col);
-	void decodeMarkerValue(double i, double l, int size_div_sm);
+	void decodeMarkerValue(int di, double i, double l, int size_div_sm);
+	void setupCamera();
+	void setupGimbalCamera();
+	void setupVectorCamera();
+	void setupLighting();
+	// lights - OpenGL guarantees at least 8
+	static const int MAX_LIGHTS = 8;
+	Light lights[MAX_LIGHTS];
 };

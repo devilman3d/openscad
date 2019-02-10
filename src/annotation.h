@@ -1,9 +1,9 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <unordered_map>
 #include "memory.h"
-#include "value.h"
 
 class Annotation
 {
@@ -13,7 +13,7 @@ public:
 	
 	std::string dump() const;
 	const std::string &getName() const;
-	virtual ValuePtr evaluate(class Context *ctx) const;
+	virtual class ValuePtr evaluate(class Context *ctx) const;
 	
 private:
 	std::string name;

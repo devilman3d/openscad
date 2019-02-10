@@ -36,15 +36,20 @@
 class OpenCSGPrim : public OpenCSG::Primitive
 {
 public:
-	OpenCSGPrim(OpenCSG::Operation operation, unsigned int convexity) :
-			OpenCSG::Primitive(operation, convexity) { }
+	OpenCSGPrim(const CSGChainObject &csgobj, OpenCSG::Operation operation)
+		: OpenCSG::Primitive(operation, csgobj.leaf->geom->getConvexity())
+		, geom(csgobj.leaf->geom)
+		, m(csgobj.leaf->matrix)
+	{
+	}
+
 	shared_ptr<const Geometry> geom;
 	Transform3d m;
-	Renderer::csgmode_e csgmode;
+
 	virtual void render() {
 		glPushMatrix();
 		glMultMatrixd(m.data());
-		Renderer::render_surface(geom, csgmode, m);
+		Renderer::render_surface(geom, Renderer::CSGMODE_NONE, m.matrix().determinant() < 0);
 		glPopMatrix();
 	}
 };
@@ -52,110 +57,89 @@ public:
 #endif
 
 OpenCSGRenderer::OpenCSGRenderer(shared_ptr<CSGProducts> root_products,
-																 shared_ptr<CSGProducts> highlights_products,
-																 shared_ptr<CSGProducts> background_products,
-																 GLint *shaderinfo)
-	: root_products(root_products), 
-		highlights_products(highlights_products), 
-		background_products(background_products), shaderinfo(shaderinfo)
+								 shared_ptr<CSGProducts> highlights_products,
+								 shared_ptr<CSGProducts> background_products)
+	: root_products(root_products)
+	, highlights_products(highlights_products)
+	, background_products(background_products)
 {
 }
 
 void OpenCSGRenderer::draw(bool /*showfaces*/, bool showedges) const
 {
-	GLint *shaderinfo = this->shaderinfo;
-	if (!shaderinfo[0]) shaderinfo = NULL;
 	if (this->root_products) {
-		renderCSGProducts(*this->root_products, showedges ? shaderinfo : NULL, false, false);
+		renderCSGProducts(*this->root_products, showedges, false, false);
 	}
 	if (this->background_products) {
-		renderCSGProducts(*this->background_products, showedges ? shaderinfo : NULL, false, true);
+		renderCSGProducts(*this->background_products, showedges, false, true);
 	}
 	if (this->highlights_products) {
-		renderCSGProducts(*this->highlights_products, showedges ? shaderinfo : NULL, true, false);
+		renderCSGProducts(*this->highlights_products, showedges, true, false);
 	}
 }
 
-// Primitive for rendering using OpenCSG
-OpenCSGPrim *OpenCSGRenderer::createCSGPrimitive(const CSGChainObject &csgobj, OpenCSG::Operation operation, bool highlight_mode, bool background_mode, OpenSCADOperator type) const
-{
-	OpenCSGPrim *prim = new OpenCSGPrim(operation, csgobj.leaf->geom->getConvexity());
-	prim->geom = csgobj.leaf->geom;
-	prim->m = csgobj.leaf->matrix;
-	prim->csgmode = csgmode_e(
-		(highlight_mode ? 
-		 CSGMODE_HIGHLIGHT :
-		 (background_mode ? CSGMODE_BACKGROUND : CSGMODE_NORMAL)) |
-		(type == OPENSCAD_DIFFERENCE ? CSGMODE_DIFFERENCE : CSGMODE_NONE));
-	return prim;
-}
-
-void OpenCSGRenderer::renderCSGProducts(const CSGProducts &products, GLint *shaderinfo, 
-																				bool highlight_mode, bool background_mode) const
+void OpenCSGRenderer::renderCSGProducts(const CSGProducts &products, bool showedges, bool highlight_mode, bool background_mode) const
 {
 #ifdef ENABLE_OPENCSG
+	std::vector<shared_ptr<OpenCSGPrim>> handles;
 	for(const auto &product : products.products) {
 		std::vector<OpenCSG::Primitive*> primitives;
 		for(const auto &csgobj : product.intersections) {
-			if (csgobj.leaf->geom) primitives.push_back(createCSGPrimitive(csgobj, OpenCSG::Intersection, highlight_mode, background_mode, OPENSCAD_INTERSECTION));
+			if (csgobj.leaf->geom) {
+				auto prim = std::make_shared<OpenCSGPrim>(csgobj, OpenCSG::Intersection);
+				handles.push_back(prim);
+				primitives.push_back(prim.get());
+			}
 		}
 		for(const auto &csgobj : product.subtractions) {
-			if (csgobj.leaf->geom) primitives.push_back(createCSGPrimitive(csgobj, OpenCSG::Subtraction, highlight_mode, background_mode, OPENSCAD_DIFFERENCE));
+			if (csgobj.leaf->geom) {
+				auto prim = std::make_shared<OpenCSGPrim>(csgobj, OpenCSG::Subtraction);
+				handles.push_back(prim);
+				primitives.push_back(prim.get());
+			}
 		}
 		if (primitives.size() > 1) {
 			OpenCSG::render(primitives);
 			glDepthFunc(GL_EQUAL);
 		}
-		if (shaderinfo) glUseProgram(shaderinfo[0]);
 
-		const CSGChainObject &parent_obj = product.intersections[0];
 		for(const auto &csgobj : product.intersections) {
 			const Color4f &c = csgobj.leaf->color;
-				csgmode_e csgmode = csgmode_e(
-					highlight_mode ? 
-					CSGMODE_HIGHLIGHT :
-					(background_mode ? CSGMODE_BACKGROUND : CSGMODE_NORMAL));
-			
-			ColorMode colormode = COLORMODE_NONE;
-			if (highlight_mode) {
-				colormode = COLORMODE_HIGHLIGHT;
-			} else if (background_mode) {
-				colormode = COLORMODE_BACKGROUND;
-			} else {
-				colormode = COLORMODE_MATERIAL;
-			}
-			
-			setColor(colormode, c.data(), shaderinfo);
+			csgmode_e csgmode = CSGMODE_NORMAL;
+			if (highlight_mode) csgmode = CSGMODE_HIGHLIGHT;
+			if (background_mode) csgmode = CSGMODE_BACKGROUND;
+
+			ColorMode colormode = COLORMODE_MATERIAL;
+			if (highlight_mode) colormode = COLORMODE_HIGHLIGHT;
+			if (background_mode) colormode = COLORMODE_BACKGROUND;
+
+			setColor(colormode, c.data());
 			glPushMatrix();
 			glMultMatrixd(csgobj.leaf->matrix.data());
-			render_surface(csgobj.leaf->geom, csgmode, csgobj.leaf->matrix, shaderinfo);
+			render_surface(csgobj.leaf->geom, csgmode, csgobj.leaf->isMirrorMatrix());
+			if (showedges)
+				render_edges(csgobj.leaf->geom, csgmode);
 			glPopMatrix();
 		}
 		for(const auto &csgobj : product.subtractions) {
 			const Color4f &c = csgobj.leaf->color;
-				csgmode_e csgmode = csgmode_e(
-					(highlight_mode ? 
-					 CSGMODE_HIGHLIGHT :
-					 (background_mode ? CSGMODE_BACKGROUND : CSGMODE_NORMAL)) | CSGMODE_DIFFERENCE);
-			
-			ColorMode colormode = COLORMODE_NONE;
-			if (highlight_mode) {
-				colormode = COLORMODE_HIGHLIGHT;
-			} else if (background_mode) {
-				colormode = COLORMODE_BACKGROUND;
-			} else {
-				colormode = COLORMODE_CUTOUT;
-			}
-			
-			setColor(colormode, c.data(), shaderinfo);
+			csgmode_e csgmode = CSGMODE_DIFFERENCE;
+			if (highlight_mode) csgmode = CSGMODE_HIGHLIGHT_DIFFERENCE;
+			if (background_mode) csgmode = CSGMODE_BACKGROUND_DIFFERENCE;
+
+			ColorMode colormode = COLORMODE_CUTOUT;
+			if (highlight_mode) colormode = COLORMODE_HIGHLIGHT;
+			if (background_mode) colormode = COLORMODE_BACKGROUND;
+
+			setColor(colormode, c.data());
 			glPushMatrix();
 			glMultMatrixd(csgobj.leaf->matrix.data());
-			render_surface(csgobj.leaf->geom, csgmode, csgobj.leaf->matrix, shaderinfo);
+			render_surface(csgobj.leaf->geom, csgmode, csgobj.leaf->isMirrorMatrix());
+			if (showedges)
+				render_edges(csgobj.leaf->geom, csgmode);
 			glPopMatrix();
 		}
 
-		if (shaderinfo) glUseProgram(0);
-		for(auto &p : primitives) delete p;
 		glDepthFunc(GL_LEQUAL);
 	}
 #endif
@@ -167,7 +151,5 @@ BoundingBox OpenCSGRenderer::getBoundingBox() const
 	if (this->root_products) bbox = this->root_products->getBoundingBox();
 	if (this->highlights_products) bbox.extend(this->highlights_products->getBoundingBox());
 	if (this->background_products) bbox.extend(this->background_products->getBoundingBox());
-
-
 	return bbox;
 }

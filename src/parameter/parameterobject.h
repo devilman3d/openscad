@@ -2,6 +2,7 @@
 
 #include "value.h"
 #include "Assignment.h"
+#include "FileModule.h"
 #include "expression.h"
 
 #include <QString>
@@ -28,8 +29,8 @@ private:
 	
 public:
 	ParameterObject();
-	void setAssignment(Context *context, const Assignment *assignment, const ValuePtr defaultValue);
-	void applyParameter(Assignment &assignment);
+	void setAssignment(Context *context, const Parameter *assignment, const ValuePtr defaultValue);
+	void applyParameter(Parameter &assignment);
 	bool operator==(const ParameterObject &second);
 	
 protected:

@@ -401,6 +401,7 @@
     <addaction name="viewActionHideToolBars"/>
     <addaction name="viewActionHideEditor"/>
     <addaction name="viewActionHideConsole"/>
+     <addaction name="viewActionHideObjects"/>
     <addaction name="viewActionHideParameters"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
@@ -596,6 +597,43 @@
     </layout>
    </widget>
   </widget>
+   <widget class="Dock" name="objectsDock">
+     <attribute name="dockWidgetArea">
+       <number>8</number>
+     </attribute>
+     <widget class="QWidget" name="objectsDockContents">
+       <layout class="QVBoxLayout" name="verticalLayout_5">
+         <property name="leftMargin">
+           <number>0</number>
+         </property>
+         <property name="topMargin">
+           <number>0</number>
+         </property>
+         <property name="rightMargin">
+           <number>0</number>
+         </property>
+         <property name="bottomMargin">
+           <number>0</number>
+         </property>
+         <item>
+           <widget class="QTextEdit" name="objectsText">
+             <property name="minimumSize">
+               <size>
+                 <width>10</width>
+                 <height>10</height>
+               </size>
+             </property>
+             <property name="focusPolicy">
+               <enum>Qt::ClickFocus</enum>
+             </property>
+             <property name="readOnly">
+               <bool>true</bool>
+             </property>
+           </widget>
+         </item>
+       </layout>
+     </widget>
+   </widget>
   <widget class="Dock" name="parameterDock">
    <property name="windowTitle">
     <string>Parameter Widget</string>
@@ -620,9 +658,11 @@
      <property name="spacing">
       <number>0</number>
      </property>
+      <!--
      <item row="0" column="0">
       <widget class="ParameterWidget" name="parameterWidget" native="true"/>
      </item>
+     -->
     </layout>
    </widget>
   </widget>
@@ -1124,6 +1164,14 @@
     <string>H&amp;ide console</string>
    </property>
   </action>
+   <action name="viewActionHideObjects">
+     <property name="checkable">
+       <bool>true</bool>
+     </property>
+     <property name="text">
+       <string>Hide ob&amp;jects</string>
+     </property>
+   </action>
   <action name="helpActionAbout">
    <property name="enabled">
     <bool>true</bool>

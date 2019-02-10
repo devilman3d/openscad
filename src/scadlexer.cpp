@@ -1,20 +1,21 @@
 #include <boost/algorithm/string.hpp>
 
 #include "scadlexer.h"
+#include "builtin.h"
 
 ScadLexer::ScadLexer(QObject *parent) : QsciLexerCPP(parent)
 {
 	// -> Style: Keyword (lexer.l)
 	keywordSet[0] =
-		"if else let for each module function true false undef "
+		"if else let for each module function struct true false undef "
 		"include use";
 
 	// -> Style: KeywordSet2 (func.cc)
-	keywordSet[1] =
-		"abs sign rands min max sin cos asin acos tan atan atan2 "
-		"round ceil floor pow sqrt exp len log ln str chr concat "
-		"lookup search version version_num norm cross parent_module "
-		"dxf_dim dxf_cross";
+	keywordSet[1] = Builtins::getLexerKeywords(1);
+		//"abs sign rands min max sin cos asin acos tan atan atan2 "
+		//"round ceil floor pow sqrt exp len log ln str chr concat "
+		//"lookup search version version_num norm cross parent_module "
+		//"dxf_dim dxf_cross";
 
 	// -> used in comments only like /*! \cube */
 	keywordSet[2] =
@@ -22,12 +23,12 @@ ScadLexer::ScadLexer(QObject *parent) : QsciLexerCPP(parent)
 		"interface param see return class brief";
 
 	// -> Style: GlobalClass
-	keywordSet[3] =
-		"cube sphere cylinder polyhedron square circle polygon text "
-		"minkowski hull resize child children echo union difference "
-		"intersection linear_extrude rotate_extrude import group  "
-		"projection render surface scale rotate mirror translate "
-		"multmatrix color offset ";
+	keywordSet[3] = Builtins::getLexerKeywords(3);
+		//"cube sphere cylinder polyhedron square circle polygon text "
+		//"minkowski hull resize child children echo union difference "
+		//"intersection linear_extrude rotate_extrude import group "
+		//"projection render surface scale rotate mirror translate "
+		//"multmatrix color offset glide split";
 
     setFoldComments(true);
     setFoldAtElse(true);

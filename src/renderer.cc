@@ -9,8 +9,8 @@
 bool Renderer::getColor(Renderer::ColorMode colormode, Color4f &col) const
 {
 	if (colormode==COLORMODE_NONE) return false;
-	if (colormap.count(colormode) > 0) {
-		col = colormap.at(colormode);
+	if (colormap[colormode][0] >= 0) {
+		col = colormap[colormode];
 		return true;
 	}
 	return false;
@@ -19,6 +19,8 @@ bool Renderer::getColor(Renderer::ColorMode colormode, Color4f &col) const
 Renderer::Renderer() : colorscheme(NULL)
 {
 	PRINTD("Renderer() start");
+	for (int i = 0; i < ColorModeCount; ++i)
+		colormap[i] = { -1, -1, -1, -1 };
 	// Setup default colors
 	// The main colors, MATERIAL and CUTOUT, come from this object's
 	// colorscheme. Colorschemes don't currently hold information
@@ -38,7 +40,7 @@ Renderer::Renderer() : colorscheme(NULL)
 	PRINTD("Renderer() end");
 }
 
-void Renderer::setColor(const float color[4], GLint *shaderinfo) const
+void Renderer::setColor(const float color[4]) const
 {
 	PRINTD("setColor a");
 	Color4f col;
@@ -49,40 +51,40 @@ void Renderer::setColor(const float color[4], GLint *shaderinfo) const
 	if (c[2] < 0) c[2] = col[2];
 	if (c[3] < 0) c[3] = col[3];
 	glColor4fv(c);
-#ifdef ENABLE_OPENCSG
-	if (shaderinfo) {
-		glUniform4f(shaderinfo[1], c[0], c[1], c[2], c[3]);
-		glUniform4f(shaderinfo[2], (c[0]+1)/2, (c[1]+1)/2, (c[2]+1)/2, 1.0);
-	}
-#endif
 }
 
-void Renderer::setColor(ColorMode colormode, const float color[4], GLint *shaderinfo) const
+void Renderer::setColor(ColorMode colormode, const float color[4]) const
 {
 	PRINTD("setColor b");
 	Color4f basecol;
 	if (getColor(colormode, basecol)) {
 		if (colormode == COLORMODE_BACKGROUND) {
 			basecol = Color4f(color[0] >= 0 ? color[0] : basecol[0],
-												color[1] >= 0 ? color[1] : basecol[1],
-												color[2] >= 0 ? color[2] : basecol[2],
-												color[3] >= 0 ? color[3] : basecol[3]);
+							  color[1] >= 0 ? color[1] : basecol[1],
+							  color[2] >= 0 ? color[2] : basecol[2],
+							  color[3] >= 0 ? color[3] : basecol[3]);
 		}
 		else if (colormode != COLORMODE_HIGHLIGHT) {
 			basecol = Color4f(color[0] >= 0 ? color[0] : basecol[0],
-												color[1] >= 0 ? color[1] : basecol[1],
-												color[2] >= 0 ? color[2] : basecol[2],
-												color[3] >= 0 ? color[3] : basecol[3]);
+							  color[1] >= 0 ? color[1] : basecol[1],
+							  color[2] >= 0 ? color[2] : basecol[2],
+							  color[3] >= 0 ? color[3] : basecol[3]);
 		}
-		setColor(basecol.data(), shaderinfo);
+		setColor(basecol.data());
 	}
 }
 
-void Renderer::setColor(ColorMode colormode, GLint *shaderinfo) const
+void Renderer::setColor(ColorMode colormode, const Color4f &color) const
+{
+	PRINTD("setColor cc");
+	setColor(colormode, color.data());
+}
+
+void Renderer::setColor(ColorMode colormode) const
 {	
 	PRINTD("setColor c");
 	float c[4] = {-1,-1,-1,-1};
-	setColor(colormode, c, shaderinfo);
+	setColor(colormode, c);
 }
 
 /* fill this->colormap with matching entries from the colorscheme. note 
@@ -99,15 +101,26 @@ void Renderer::setColorScheme(const ColorScheme &cs) {
 	this->colorscheme = &cs;
 }
 
-void Renderer::render_surface(shared_ptr<const Geometry> geom, csgmode_e csgmode, const Transform3d &m, GLint *shaderinfo)
+void Renderer::render_surface(shared_ptr<const Geometry> geom, csgmode_e csgmode, bool mirrored)
 {
-	shared_ptr<const PolySet> ps = dynamic_pointer_cast<const PolySet>(geom);
-	if (ps) ps->render_surface(csgmode, m, shaderinfo);
+	//glDepthMask(true);
+	//glEnable(GL_LIGHTING);
+	if (auto ps = dynamic_pointer_cast<const PolySet>(geom))
+		ps->render_surface(csgmode, mirrored);
+	else if (auto gg = dynamic_pointer_cast<const GeometryGroup>(geom))
+		for (const auto &g : gg->getChildren())
+			render_surface(g.second, csgmode, mirrored);
+
 }
 
 void Renderer::render_edges(shared_ptr<const Geometry> geom, csgmode_e csgmode)
 {
-	shared_ptr<const PolySet> ps = dynamic_pointer_cast<const PolySet>(geom);
-	if (ps) ps->render_edges(csgmode);
+	//glDepthMask(false);
+	//glDisable(GL_LIGHTING);
+	if (auto ps = dynamic_pointer_cast<const PolySet>(geom))
+		ps->render_edges(csgmode);
+	else if (auto gg = dynamic_pointer_cast<const GeometryGroup>(geom))
+		for (const auto &g : gg->getChildren())
+			render_edges(g.second, csgmode);
 }
 

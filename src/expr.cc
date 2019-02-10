@@ -24,6 +24,7 @@
  *
  */
 #include "expression.h"
+#include "expressions.h"
 #include "value.h"
 #include "evalcontext.h"
 #include <cstdint>
@@ -34,6 +35,8 @@
 #include "stackcheck.h"
 #include "exceptions.h"
 #include "feature.h"
+#include "UserModule.h"
+#include "modcontext.h"
 #include <boost/bind.hpp>
 
 #include <boost/assign/std/vector.hpp>
@@ -254,7 +257,15 @@ ArrayLookup::ArrayLookup(Expression *array, Expression *index, const Location &l
 }
 
 ValuePtr ArrayLookup::evaluate(const Context *context) const {
-	return this->array->evaluate(context)[this->index->evaluate(context)];
+	auto array = this->array->evaluate(context);
+	auto index = this->index->evaluate(context);
+	if (array->isDefinedAs(Value::STRUCT) && index->isDefinedAs(Value::STRING)) {
+		auto &s = array->toStruct();
+		ScopeContext sc(context, s);
+		sc.setName("ArrayLookup", index->toString());
+		return sc.lookup_variable(index->toString());
+	}
+	return array[index];
 }
 
 void ArrayLookup::print(std::ostream &stream) const
@@ -371,6 +382,36 @@ void Vector::print(std::ostream &stream) const
 	stream << "]";
 }
 
+ValuePtr UserStruct::evaluate(const Context *context) const
+{
+	ScopeContext sc(context, scope);
+	sc.setName("UserStruct", "anon");
+	LocalScope evalScope;
+	sc.persist(evalScope);
+	return ValuePtr(evalScope);
+}
+
+std::string UserStruct::dump(const std::string &indent) const
+{
+	std::stringstream stream;
+	stream << indent;
+	if (!name.empty())
+		stream << "struct " << name;
+	stream << "{\n";
+	stream << scope.dump(indent + "\t");
+	stream << indent << "}\n";
+	return stream.str();
+}
+
+void UserStruct::print(std::ostream &stream) const
+{
+	if (!name.empty())
+		stream << "struct " << name;
+	stream << " {\n";
+	stream << scope.dump("\t");
+	stream << "}";
+}
+
 Lookup::Lookup(const std::string &name, const Location &loc) : Expression(loc), name(name)
 {
 }
@@ -385,14 +426,15 @@ void Lookup::print(std::ostream &stream) const
 	stream << this->name;
 }
 
-MemberLookup::MemberLookup(Expression *expr, const std::string &member, const Location &loc)
-	: Expression(loc), expr(expr), member(member)
+MemberLookup::MemberLookup(const std::string &dotname, const std::string &member, const Location &loc)
+	: Expression(loc), dotname(dotname), member(member)
 {
 }
 
 ValuePtr MemberLookup::evaluate(const Context *context) const
 {
-	ValuePtr v = this->expr->evaluate(context);
+	Lookup expr(dotname, loc);
+	ValuePtr v = expr.evaluate(context);
 
 	if (v->type() == Value::VECTOR) {
 		if (this->member == "x") return v[0];
@@ -402,17 +444,21 @@ ValuePtr MemberLookup::evaluate(const Context *context) const
 		if (this->member == "begin") return v[0];
 		if (this->member == "step") return v[1];
 		if (this->member == "end") return v[2];
+	} else if (v->type() == Value::STRUCT) {
+		auto &s = v->toStruct();
+		ScopeContext sc(context, s);
+		sc.setName("MemberLookup", this->member);
+		return sc.lookup_variable(this->member);
 	}
 	return ValuePtr::undefined;
 }
 
 void MemberLookup::print(std::ostream &stream) const
 {
-	stream << *this->expr << "." << this->member;
+	stream << dotname << "." << this->member;
 }
 
-FunctionCall::FunctionCall(const std::string &name, 
-													 const AssignmentList &args, const Location &loc)
+FunctionCall::FunctionCall(const std::string &name, const AssignmentList &args, const Location &loc)
 	: Expression(loc), name(name), arguments(args)
 {
 }
@@ -446,6 +492,38 @@ Expression * FunctionCall::create(const std::string &funcname, const AssignmentL
 
 	// TODO: Generate error/warning if expr != 0?
 	return new FunctionCall(funcname, arglist, loc);
+}
+
+MemberFunctionCall::MemberFunctionCall(const std::string &dotname, const std::string &name,
+	const AssignmentList &args, const Location &loc)
+	: Expression(loc), dotname(dotname), name(name), arguments(args)
+{
+}
+
+ValuePtr MemberFunctionCall::evaluate(const Context *context) const
+{
+	if (StackCheck::inst()->check()) {
+		std::stringstream str;
+		str << dotname << "." << this->name;
+		throw RecursionException::create("function", str.str());
+	}
+
+	Lookup expr(dotname, loc);
+	ValuePtr v = expr.evaluate(context);
+	if (v->isDefinedAs(Value::STRUCT)) {
+		auto &scope = v->toStruct();
+		EvalContext ec(context, this->arguments);
+		ScopeContext sc(context, scope);
+		sc.setName("MemberFunctionCall", dotname + "." + name);
+		return sc.evaluate_function(this->name, &ec);
+	}
+
+	return ValuePtr::undefined;
+}
+
+void MemberFunctionCall::print(std::ostream &stream) const
+{
+	stream << dotname << "." << this->name << "(" << this->arguments << ")";
 }
 
 Assert::Assert(const AssignmentList &args, Expression *expr, const Location &loc)
@@ -710,7 +788,7 @@ std::ostream &operator<<(std::ostream &stream, const Expression &expr)
 	return stream;
 }
 
-void evaluate_assert(const Context &context, const class EvalContext *evalctx, const Location &loc)
+void evaluate_assert(const Context &context, const EvalArguments *evalctx, const Location &loc)
 {
 	ExperimentalFeatureException::check(Feature::ExperimentalAssertExpression);
 
@@ -723,7 +801,7 @@ void evaluate_assert(const Context &context, const class EvalContext *evalctx, c
 	for (const auto &arg : args) {
 		auto it = assignments.find(arg.name);
 		if (it != assignments.end()) {
-			c.set_variable(arg.name, assignments[arg.name]->evaluate(evalctx));
+			c.set_variable(arg.name, assignments[arg.name]->evaluate(evalctx->getEvalContext()));
 		}
 	}
 	

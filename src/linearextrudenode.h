@@ -1,26 +1,29 @@
 #pragma once
 
-#include "node.h"
-#include "value.h"
+#include "linalg.h"
 
-class LinearExtrudeNode : public AbstractPolyNode
-{
-public:
-	VISITABLE();
-	LinearExtrudeNode(const ModuleInstantiation *mi) : AbstractPolyNode(mi) {
-		convexity = slices = 0;
-		fn = fs = fa = height = twist = 0;
-		origin_x = origin_y = 0;
-		scale_x = scale_y = 1;
-		center = has_twist = false;
-	}
-	virtual std::string toString() const;
-	virtual std::string name() const { return "linear_extrude"; }
+class PolySet;
+class Outline2d;
+class Polygon2d;
+class LinearExtrudeNode;
 
-	int convexity, slices;
-	double fn, fs, fa, height, twist;
-	double origin_x, origin_y, scale_x, scale_y;
-	bool center, has_twist;
-	Filename filename;
-	std::string layername;
+struct SliceSettings {
+	double fn, fs, fa;
+	double t;
+	double z;
+	double rot;
+	bool scale0;
+
+	Eigen::Affine2d vertTransform;
+
+	SliceSettings(double t, const LinearExtrudeNode &node);
+	SliceSettings(double z);
+
+	Vector2d transformVert(const Vector2d &p) const;
+	Vector2d transformVert(const Vector3d &p) const;
+
+	static void add_slice(PolySet *ps, const Outline2d &from, const Outline2d &to, const SliceSettings &bot, const SliceSettings &top);
+	static void add_slice(PolySet *ps, const Outline2d &outline, const SliceSettings &bot, const SliceSettings &top);
+	static void add_slice(PolySet *ps, const Polygon2d &from, const Polygon2d &to, const SliceSettings &bot, const SliceSettings &top);
+	static void add_slice(PolySet *ps, const Polygon2d &poly, const SliceSettings &bot, const SliceSettings &top);
 };

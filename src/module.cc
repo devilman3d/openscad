@@ -27,6 +27,7 @@
 #include "module.h"
 #include "context.h"
 #include "value.h"
+#include "builtin.h"
 #include <sstream>
 
 AbstractModule::~AbstractModule()

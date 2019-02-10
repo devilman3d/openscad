@@ -47,7 +47,9 @@
 #include "OffscreenView.h"
 #include "GeometryEvaluator.h"
 
+#ifdef PARAMETER_UI
 #include"parameter/parameterset.h"
+#endif
 #include <string>
 #include <vector>
 #include <fstream>
@@ -202,26 +204,43 @@ void localization_init() {
 	}
 }
 
+Vector3d getVec(const vector<string> &strs, int index)
+{
+	auto x = lexical_cast<double>(strs[index + 0]);
+	auto y = lexical_cast<double>(strs[index + 1]);
+	auto z = lexical_cast<double>(strs[index + 2]);
+	return Vector3d(x, y, z);
+}
+
 Camera get_camera(po::variables_map vm)
 {
 	Camera camera;
 
 	if (vm.count("camera")) {
 		vector<string> strs;
-		vector<double> cam_parameters;
 		split(strs, vm["camera"].as<string>(), is_any_of(","));
-		if ( strs.size()==6 || strs.size()==7 ) {
-			try {
-				for(const auto &s : strs) cam_parameters.push_back(lexical_cast<double>(s));
-				camera.setup(cam_parameters);
+		try {
+			if (strs.size() == 6) {
+				VectorCam vc;
+				vc.eye = getVec(strs, 0);
+				vc.center = getVec(strs, 3);
+				camera.setup(vc);
 			}
-			catch (bad_lexical_cast &) {
-				PRINT("Camera setup requires numbers as parameters");
+			else if (strs.size() == 7 ) {
+				GimbalCam gc;
+				gc.object_rot = getVec(strs, 0);
+				gc.object_trans = getVec(strs, 3);
+				gc.viewer_distance = lexical_cast<double>(strs[6]);
+				camera.setup(gc);
+			} 
+			else {
+				PRINT("Camera setup requires either 7 numbers for Gimbal Camera");
+				PRINT("or 6 numbers for Vector Camera");
+				exit(1);
 			}
-		} else {
-			PRINT("Camera setup requires either 7 numbers for Gimbal Camera");
-			PRINT("or 6 numbers for Vector Camera");
-			exit(1);
+		}
+		catch (bad_lexical_cast &) {
+			PRINT("Camera setup requires numbers as parameters");
 		}
 	}
 
@@ -330,7 +349,8 @@ int cmdline(const char *deps_output_file, const std::string &filename, Camera &c
 
 	Tree tree;
 #ifdef ENABLE_CGAL
-	GeometryEvaluator geomevaluator(tree, true);
+	Progress progress;
+	GeometryEvaluator geomevaluator(tree, progress, true, true);
 #endif
 	if (arg_info) {
 	    info();
@@ -372,8 +392,8 @@ int cmdline(const char *deps_output_file, const std::string &filename, Camera &c
 	set_render_color_scheme(arg_colorscheme, true);
 	
 	// Top context - this context only holds builtins
-	ModuleContext top_ctx;
-	top_ctx.registerBuiltin();
+	ScopeContext top_ctx(nullptr, Builtins::getGlobalScope());
+	top_ctx.setName("cmdline", "Builtins");
 #ifdef DEBUG
 	PRINTDB("Top ModuleContext:\n%s",top_ctx.dump(NULL, NULL));
 #endif
@@ -383,8 +403,6 @@ int cmdline(const char *deps_output_file, const std::string &filename, Camera &c
 
 	FileModule *root_module;
 	ModuleInstantiation root_inst("group");
-	AbstractNode *root_node;
-	AbstractNode *absolute_root_node;
 	shared_ptr<const Geometry> root_geom;
 
 	handle_dep(filename);
@@ -406,6 +424,7 @@ int cmdline(const char *deps_output_file, const std::string &filename, Camera &c
 		return 1;
 	}
 
+#ifdef PARAMETER_UI
 	if (Feature::ExperimentalCustomizer.is_enabled()) {
 		// add parameter to AST
 		CommentParser::collectParameters(text.c_str(), root_module);
@@ -415,6 +434,7 @@ int cmdline(const char *deps_output_file, const std::string &filename, Camera &c
 			param.applyParameterSet(root_module, setName);
 		}
 	}
+#endif
     
 	root_module->handleDependencies();
 
@@ -424,10 +444,14 @@ int cmdline(const char *deps_output_file, const std::string &filename, Camera &c
 	top_ctx.setDocumentPath(fparent.string());
 
 	AbstractNode::resetIndexCounter();
-	absolute_root_node = root_module->instantiate(&top_ctx, &root_inst, NULL);
 
+	FileContext fc(&top_ctx, *root_module);
+	const AbstractNode *absolute_root_node = root_module->evaluate(fc);
 	// Do we have an explicit root node (! modifier)?
-	if (!(root_node = find_root_tag(absolute_root_node)))
+	const AbstractNode *root_node;
+	if (auto explicitRoot = find_root_tag(absolute_root_node))
+		root_node = explicitRoot;
+	else
 		root_node = absolute_root_node;
 
 	tree.setRoot(root_node);
@@ -481,7 +505,7 @@ int cmdline(const char *deps_output_file, const std::string &filename, Camera &c
 			// echo or OpenCSG png -> don't necessarily need geometry evaluation
 		} else {
 			// Force creation of CGAL objects (for testing)
-			root_geom = geomevaluator.evaluateGeometry(*tree.root(), true);
+			root_geom = geomevaluator.evaluateGeometry(*tree.root());
 			if (!root_geom) root_geom.reset(new CGAL_Nef_polyhedron());
 			if (renderer == Render::CGAL && root_geom->getDimension() == 3) {
 				const CGAL_Nef_polyhedron *N = dynamic_cast<const CGAL_Nef_polyhedron*>(root_geom.get());
@@ -575,7 +599,12 @@ int cmdline(const char *deps_output_file, const std::string &filename, Camera &c
 		return 1;
 #endif
 	}
-	delete root_node;
+	if (absolute_root_node) {
+		delete absolute_root_node;
+	}
+	//if (root_node) {
+	//	delete root_node;
+	//}
 	return 0;
 }
 
@@ -800,7 +829,6 @@ int main(int argc, char **argv)
 	// (which we don't catch). This gives us stack traces without rerunning in gdb.
 	CGAL::set_error_behaviour(CGAL::ABORT);
 #endif
-	Builtins::instance()->initialize();
 
 	fs::path original_path = fs::current_path();
 
@@ -921,7 +949,8 @@ int main(int argc, char **argv)
 
 	string parameterFile;
 	string parameterSet;
-	
+
+#ifdef PARAMETER_UI
 	if (Feature::ExperimentalCustomizer.is_enabled()) {
 		if (vm.count("p")) {
 			if (!parameterFile.empty()) help(argv[0], true);
@@ -942,6 +971,7 @@ int main(int argc, char **argv)
 			help(argv[0], true);
 		}
 	}
+#endif
 	
 	vector<string> inputFiles;
 	if (vm.count("input-file"))	{
@@ -978,7 +1008,7 @@ int main(int argc, char **argv)
 		help(argv[0], true);
 	}
 
-	Builtins::instance(true);
+	Builtins::release();
 
 	return rc;
 }

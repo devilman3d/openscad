@@ -1,32 +1,58 @@
 #pragma once
 
-#include "Assignment.h"
 #include <unordered_map>
+#include <vector>
+#include "Handles.h"
+
+struct NamedASTNode
+{
+	std::string name;
+	std::shared_ptr<class ASTNode> node;
+
+	NamedASTNode(const class Assignment &ass);
+	NamedASTNode(std::string name, class UserStruct *s);
+	NamedASTNode(std::string name, class UserFunction *f);
+	NamedASTNode(std::string name, class UserModule *m);
+	NamedASTNode(std::string name, class ModuleInstantiation *mi);
+	NamedASTNode(std::string name, class Expression *e);
+};
 
 class LocalScope
 {
 public:
-	LocalScope();
-	~LocalScope();
+	size_t numElements() const { return orderedDefinitions.size(); }
 
-	size_t numElements() const { return assignments.size() + children.size(); }
 	std::string dump(const std::string &indent) const;
-	std::vector<class AbstractNode*> instantiateChildren(const class Context *evalctx) const;
-	void addChild(class ModuleInstantiation *astnode);
-	void addModule(const std::string &name, class UserModule *module);
-	void addFunction(class UserFunction *function);
-	void addAssignment(const class Assignment &ass);
-	void apply(Context &ctx) const;
+	void print(std::ostream &stream) const;
 
-	AssignmentList assignments;
+	void addValue(const std::string &name, const class ValuePtr &value);
+	void addAssignment(const class Assignment &ass);
+	void addStruct(class UserStruct *astnode);
+	void addFunction(class UserFunction *astnode);
+	void addResult(class Expression *astnode);
+	void addModule(class UserModule *astnode);
+	void addChild(class ModuleInstantiation *astnode);
+
+	void apply(class Context &ctx) const;
+	void evaluate(class Context &ctx, NodeHandles &children) const;
+
+	LocalScope operator+(const LocalScope &other) const;
+	bool operator==(const LocalScope &other) const;
+
+	// local assignments
+	//std::vector<std::string> assignments;
+
+	// local instantiations
 	std::vector<ModuleInstantiation*> children;
 
-	// Modules and functions are stored twice; once for lookup and once for AST serialization
+	// shared pointers to user objects
+	std::vector<NamedASTNode> orderedDefinitions;
+
+	// functions for lookup
 	typedef std::unordered_map<std::string, class AbstractFunction*> FunctionContainer;
 	FunctionContainer functions;
-	std::vector<std::pair<std::string, AbstractFunction*>> astFunctions;
 
-	typedef std::unordered_map<std::string, class AbstractModule*> AbstractModuleContainer;
-	AbstractModuleContainer	modules;
-	std::vector<std::pair<std::string, AbstractModule*>> astModules;
+	// modules for lookup
+	typedef std::unordered_map<std::string, class AbstractModule*> ModuleContainer;
+	ModuleContainer modules;
 };

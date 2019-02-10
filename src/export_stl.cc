@@ -40,7 +40,7 @@ static void append_stl(const PolySet &ps, std::ostream &output)
 	PolysetUtils::tessellate_faces(ps, triangulated);
 
 	setlocale(LC_NUMERIC, "C"); // Ensure radix is . (not ,) in output
-	for(const auto &p : triangulated.polygons) {
+	for(const auto &p : triangulated.getPolygons()) {
 		assert(p.size() == 3); // STL only allows triangles
 		std::stringstream stream;
 		stream << p[0][0] << " " << p[0][1] << " " << p[0][2];
@@ -146,25 +146,23 @@ static void append_stl(const CGAL_Polyhedron &P, std::ostream &output)
  */
 static void append_stl(const CGAL_Nef_polyhedron &root_N, std::ostream &output)
 {
-	if (!root_N.p3->is_simple()) {
+	if (!root_N->is_simple()) {
 		PRINT("WARNING: Exported object may not be a valid 2-manifold and may need repair");
 	}
 
 	bool usePolySet = true;
 	if (usePolySet) {
-		PolySet ps(3);
-		bool err = CGALUtils::createPolySetFromNefPolyhedron3(*(root_N.p3), ps);
-		if (err) { PRINT("ERROR: Nef->PolySet failed"); }
-		else {
-			append_stl(ps, output);
-		}
+		if (auto ps = CGALUtils::createPolySetFromNefPolyhedron(*root_N))
+			append_stl(*PolySetHandle(ps), output);
+		else 
+			PRINT("ERROR: Nef->PolySet failed");
 	}
 	else {
-		CGALUtils::lockErrors(CGAL::THROW_EXCEPTION);
+		CGALUtils::ErrorLocker errorLocker;
 		try {
 			CGAL_Polyhedron P;
 			//root_N.p3->convert_to_Polyhedron(P);
-			bool err = nefworkaround::convert_to_Polyhedron<CGAL_Kernel3>( *(root_N.p3), P );
+			bool err = nefworkaround::convert_to_Polyhedron<CGAL_Kernel3>( *(root_N), P );
 			if (err) {
 				PRINT("ERROR: CGAL NefPolyhedron->Polyhedron conversion failed");
 				return;
@@ -177,13 +175,17 @@ static void append_stl(const CGAL_Nef_polyhedron &root_N, std::ostream &output)
 		catch (...) {
 			PRINT("ERROR: CGAL unknown error in CGAL_Nef_polyhedron3::convert_to_Polyhedron()");
 		}
-		CGALUtils::unlockErrors();
 	}
 }
 
 static void append_stl(const shared_ptr<const Geometry> &geom, std::ostream &output)
 {
-	if (const CGAL_Nef_polyhedron *N = dynamic_cast<const CGAL_Nef_polyhedron *>(geom.get())) {
+	if (const GeometryGroup *G = dynamic_cast<const GeometryGroup*>(geom.get())) {
+		for (const auto &child : G->getChildren()) {
+			append_stl(child.second, output);
+		}
+	}
+	else if (const CGAL_Nef_polyhedron *N = dynamic_cast<const CGAL_Nef_polyhedron *>(geom.get())) {
 		append_stl(*N, output);
 	}
 	else if (const PolySet *ps = dynamic_cast<const PolySet *>(geom.get())) {

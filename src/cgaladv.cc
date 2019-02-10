@@ -30,158 +30,246 @@
 #include "evalcontext.h"
 #include "builtin.h"
 #include "polyset.h"
+#include "cgalutils.h"
+#include "FactoryNode.h"
+#include "maybe_const.h"
+#include "PathHelpers.h"
+#include "Handles.h"
+#include <CGAL/convex_hull_2.h>
 #include <sstream>
 #include <assert.h>
 #include <boost/assign/std/vector.hpp>
 using namespace boost::assign; // bring 'operator+=()' into scope
 
-class CgaladvModule : public AbstractModule
+class MinkowskiNode : public FactoryNode
 {
 public:
-	cgaladv_type_e type;
-	CgaladvModule(cgaladv_type_e type) : type(type) { }
-	virtual AbstractNode *instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const;
+	Geometry *applyMinkowski2D(const GeometryHandles &children) const
+	{
+		Polygon2ds raw_polys;
+		GeomUtils::collect(children, raw_polys);
+		if (!raw_polys.empty()) {
+			ClipperUtils utils;
+			return utils.applyMinkowski(raw_polys);
+		}
+		return nullptr;
+	}
+
+	virtual ResultObject processChildren(const NodeGeometries &children) const
+	{
+		int dim = 0;
+		GeometryHandles geom;
+		GeomUtils::collect(children, geom, dim, true);
+		const Geometry *result = nullptr;
+		if (dim == 2)
+			result = applyMinkowski2D(geom);
+		if (dim == 3)
+			result = CGALUtils::applyMinkowski(geom);
+		if (result)
+			return ResultObject(result);
+		return ResultObject(new EmptyGeometry());
+	}
 };
 
-AbstractNode *CgaladvModule::instantiate(const Context *ctx, const ModuleInstantiation *inst, EvalContext *evalctx) const
+FactoryModule<MinkowskiNode> MinkowskiNodeFactory("minkowski");
+
+class GlideNode : public FactoryNode
 {
-	CgaladvNode *node = new CgaladvNode(inst, type);
+public:
+	ValuePtr paths;
+	ValuePtr points;
 
-	AssignmentList args;
+	GlideNode() : FactoryNode("points", "paths") { }
 
-	if (type == MINKOWSKI)
-		args += Assignment("convexity");
-
-	if (type == GLIDE)
-		args += Assignment("path"), Assignment("convexity");
-
-	if (type == SUBDIV)
-		args += Assignment("type"), Assignment("level"), Assignment("convexity");
-
-	if (type == RESIZE)
-		args += Assignment("newsize"), Assignment("auto");
-
-	Context c(ctx);
-	c.setVariables(args, evalctx);
-	inst->scope.apply(*evalctx);
-
-	ValuePtr convexity = ValuePtr::undefined;
-	ValuePtr path = ValuePtr::undefined;
-	ValuePtr subdiv_type = ValuePtr::undefined;
-	ValuePtr level = ValuePtr::undefined;
-	
-	if (type == MINKOWSKI) {
-		convexity = c.lookup_variable("convexity", true);
+	void initialize(Context &ctx, const ModuleContext &evalctx) override
+	{
+		paths = ctx.lookup("paths");
+		points = ctx.lookup("points");
 	}
 
-	if (type == GLIDE) {
-		convexity = c.lookup_variable("convexity", true);
-		path = c.lookup_variable("path", false);
+	virtual ResultObject processChildren(const NodeGeometries &children) const
+	{
+		GeometryHandles paths;
+
+		// create polyhedron(s) for the path/points[path]/points[paths[path]]
+		{
+			auto polys = PathHelpers::createPolylines3d(this->paths, this->points);
+			for (auto poly : polys)
+			{
+				PRINT("Glide: Processing path");
+				GeometryHandle pp(new CGAL_Nef_polyhedron(*poly));
+				paths.push_back(pp);
+				delete poly;
+			}
+		}
+
+		// find all the non-empty children
+		int dim = 3;
+		GeometryHandles actualchildren;
+		GeomUtils::collect(children, actualchildren, dim);
+
+		GeometryHandles finishchildren;
+		if (!paths.empty() && !actualchildren.empty())
+		{
+			size_t t = paths.size();
+			auto iter = paths.begin();
+			for (size_t i = 1; iter != paths.end(); ++i, ++iter)
+			{
+				GeometryHandles pathChildren = actualchildren;
+				pathChildren.insert(pathChildren.begin(), *iter);
+				// apply the glide
+				try
+				{
+					PRINTB("Glide: Performing Minkowski on path %d/%d", i % t);
+					GeometryHandle mink(CGALUtils::applyMinkowski(pathChildren));
+					finishchildren.push_back(mink);
+					PRINTB("Glide: Finished Minkowski on path %d/%d", i % t);
+				}
+				catch (const std::exception &ex)
+				{
+					PRINTB("Glide: Caught an exeption: %s", ex.what());
+				}
+			}
+		}
+		else if (!actualchildren.empty())
+		{
+			GeometryHandles justChildren = actualchildren;
+			if (justChildren.size() > 1)
+			{
+				// apply the glide
+				PRINT("Glide: Performing Minkowski");
+				GeometryHandle mink(CGALUtils::applyMinkowski(justChildren));
+				finishchildren.push_back(mink);
+			}
+			else if (justChildren.size() == 1)
+				finishchildren.push_back(justChildren.front());
+		}
+
+		// nothing to do?
+		if (finishchildren.empty()) return ResultObject(new EmptyGeometry());
+
+		// this is a noop?
+		if (finishchildren.size() == 1) return ResultObject(finishchildren.front());
+
+		// union the result
+		PRINT("Glide: Unioning result");
+		return ResultObject(CGALUtils::applyOperator(finishchildren, OPENSCAD_UNION));
+	}
+};
+
+FactoryModule<GlideNode> GlideNodeFactory("glide");
+
+// TODO: implement SubdivNode
+
+class HullNode : public FactoryNode
+{
+public:
+	Polygon2d *applyHull2D(const GeometryHandles &children) const
+	{
+		Polygon2d *geometry = new Polygon2d();
+
+		typedef CGAL::Point_2<CGAL::Cartesian<double>> CGALPoint2;
+		// Collect point cloud
+		std::list<CGALPoint2> points;
+		for (const auto &p : children) {
+			if (auto p2d = dynamic_pointer_cast<const Polygon2d>(p)) {
+				for (const auto &o : p2d->outlines()) {
+					for (const auto &v : o.vertices) {
+						points.push_back(CGALPoint2(v[0], v[1]));
+					}
+				}
+			}
+		}
+		if (points.size() > 0) {
+			// Apply hull
+			std::list<CGALPoint2> result;
+			CGAL::convex_hull_2(points.begin(), points.end(), std::back_inserter(result));
+
+			// Construct Polygon2d
+			Outline2d outline;
+			for (const auto &p : result) {
+				outline.vertices.push_back(Vector2d(p[0], p[1]));
+			}
+			geometry->addOutline(outline);
+		}
+		return geometry;
 	}
 
-	if (type == SUBDIV) {
-		convexity = c.lookup_variable("convexity", true);
-		subdiv_type = c.lookup_variable("type", false);
-		level = c.lookup_variable("level", true);
+	virtual ResultObject processChildren(const NodeGeometries &children) const
+	{
+		int dim = 0;
+		GeometryHandles geom;
+		GeomUtils::collect(children, geom, dim);
+		const Geometry *result = nullptr;
+		if (dim == 2)
+			result = applyHull2D(geom);
+		if (dim == 3) {
+			auto ps = new PolySet(3);
+			if (CGALUtils::applyHull(geom, *ps))
+				result = ps;
+		}
+		if (result)
+			return ResultObject(result);
+		return ResultObject(new EmptyGeometry());
 	}
+};
 
-	if (type == RESIZE) {
-		ValuePtr ns = c.lookup_variable("newsize");
-		node->newsize << 0,0,0;
-		if ( ns->type() == Value::VECTOR ) {
+FactoryModule<HullNode> HullNodeFactory("hull");
+
+class ResizeNode : public FactoryNode
+{
+public:
+	Vector3d newsize;
+	Eigen::Matrix<bool, 3, 1> autosize;
+
+	ResizeNode() : FactoryNode("newsize", "auto") { }
+
+	void initialize(Context &ctx, const ModuleContext &evalctx) override
+	{
+		ValuePtr ns = ctx.lookup("newsize");
+		this->newsize << 0, 0, 0;
+		if (ns->type() == Value::VECTOR) {
 			const Value::VectorType &vs = ns->toVector();
-			if ( vs.size() >= 1 ) node->newsize[0] = vs[0]->toDouble();
-			if ( vs.size() >= 2 ) node->newsize[1] = vs[1]->toDouble();
-			if ( vs.size() >= 3 ) node->newsize[2] = vs[2]->toDouble();
+			if (vs.size() >= 1) this->newsize[0] = vs[0]->toDouble();
+			if (vs.size() >= 2) this->newsize[1] = vs[1]->toDouble();
+			if (vs.size() >= 3) this->newsize[2] = vs[2]->toDouble();
 		}
-		ValuePtr autosize = c.lookup_variable("auto");
-		node->autosize << false, false, false;
-		if ( autosize->type() == Value::VECTOR ) {
+		ValuePtr autosize = ctx.lookup("auto");
+		this->autosize << false, false, false;
+		if (autosize->type() == Value::VECTOR) {
 			const Value::VectorType &va = autosize->toVector();
-			if ( va.size() >= 1 ) node->autosize[0] = va[0]->toBool();
-			if ( va.size() >= 2 ) node->autosize[1] = va[1]->toBool();
-			if ( va.size() >= 3 ) node->autosize[2] = va[2]->toBool();
+			if (va.size() >= 1) this->autosize[0] = va[0]->toBool();
+			if (va.size() >= 2) this->autosize[1] = va[1]->toBool();
+			if (va.size() >= 3) this->autosize[2] = va[2]->toBool();
 		}
-		else if ( autosize->type() == Value::BOOL ) {
-			node->autosize << autosize->toBool(),autosize->toBool(),autosize->toBool();
+		else if (autosize->type() == Value::BOOL) {
+			this->autosize << autosize->toBool(), autosize->toBool(), autosize->toBool();
 		}
 	}
 
-	node->convexity = (int)convexity->toDouble();
-	node->path = path;
-	node->subdiv_type = subdiv_type->toString();
-	node->level = (int)level->toDouble();
-
-	if (node->level <= 1)
-		node->level = 1;
-
-	std::vector<AbstractNode *> instantiatednodes = inst->instantiateChildren(evalctx);
-	node->children.insert(node->children.end(), instantiatednodes.begin(), instantiatednodes.end());
-
-	return node;
-}
-
-std::string CgaladvNode::name() const
-{
-	switch (this->type) {
-	case MINKOWSKI:
-		return "minkowski";
-		break;
-	case GLIDE:
-		return "glide";
-		break;
-	case SUBDIV:
-		return "subdiv";
-		break;
-	case HULL:
-		return "hull";
-		break;
-	case RESIZE:
-		return "resize";
-		break;
-	default:
-		assert(false);
+	virtual ResultObject processChildren(const NodeGeometries &children) const
+	{
+		if (auto res = GeomUtils::apply(children, OPENSCAD_UNION)) {
+			if (res.isConst())
+				res.reset(res->copy());
+			auto editable = res.ptr();
+			if (auto N = dynamic_pointer_cast<CGAL_Nef_polyhedron>(editable)) {
+				N->resize(this->newsize, this->autosize);
+			}
+			else if (auto poly = dynamic_pointer_cast<Polygon2d>(editable)) {
+				poly->resize(Vector2d(this->newsize[0], this->newsize[1]),
+					Eigen::Matrix<bool, 2, 1>(this->autosize[0], this->autosize[1]));
+			}
+			else if (auto ps = dynamic_pointer_cast<PolySet>(editable)) {
+				ps->resize(this->newsize, this->autosize);
+			}
+			else {
+				assert(false);
+			}
+			return res;
+		}
+		return ResultObject(new EmptyGeometry());
 	}
-	return "internal_error";
-}
+};
 
-std::string CgaladvNode::toString() const
-{
-	std::stringstream stream;
-
-	stream << this->name();
-	switch (type) {
-	case MINKOWSKI:
-		stream << "(convexity = " << this->convexity << ")";
-		break;
-	case GLIDE:
-		stream << "(path = " << *this->path << ", convexity = " << this->convexity << ")";
-		break;
-	case SUBDIV:
-		stream << "(level = " << this->level << ", convexity = " << this->convexity << ")";
-		break;
-	case HULL:
-		stream << "()";
-		break;
-	case RESIZE:
-		stream << "(newsize = ["
-		  << this->newsize[0] << "," << this->newsize[1] << "," << this->newsize[2] << "]"
-		  << ", auto = ["
-		  << this->autosize[0] << "," << this->autosize[1] << "," << this->autosize[2] << "]"
-		  << ")";
-		break;
-	default:
-		assert(false);
-	}
-
-	return stream.str();
-}
-
-void register_builtin_cgaladv()
-{
-	Builtins::init("minkowski", new CgaladvModule(MINKOWSKI));
-	Builtins::init("glide", new CgaladvModule(GLIDE));
-	Builtins::init("subdiv", new CgaladvModule(SUBDIV));
-	Builtins::init("hull", new CgaladvModule(HULL));
-	Builtins::init("resize", new CgaladvModule(RESIZE));
-}
+FactoryModule<ResizeNode> ResizeNodeFactory("resize");
